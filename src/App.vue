@@ -1,11 +1,3 @@
-<<<<<<< HEAD
-<template>
-  <div class="app-shell">
-    <Navbar />
-    <main class="app-main">
-      <router-view />
-    </main>
-=======
 <script setup>
 import { computed } from 'vue'
 import { RouterView } from 'vue-router'
@@ -23,7 +15,6 @@ const currentYear = computed(() => new Date().getFullYear())
     <footer>
       <p>© {{ currentYear }} AgroGestor. Gestión agrícola inteligente.</p>
     </footer>
->>>>>>> 2ca9f9bca785590591df9fa0ca7e0c99f23bf9f5
   </div>
 </template>
 
