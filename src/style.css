@@ -1,7 +1,16 @@
 :root {
   font-family: 'Montserrat', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  color: #10375c;
-  background-color: #fdf8ee;
+  /* Paleta verde profunda inspirada en la imagen */
+  --bg: #e6efe9; /* fondo suave - ligeramente más oscuro para contraste */
+  --card-bg: #ffffff;
+  --text: #0b3f39;
+  --primary: #0b3f39; /* verde profundo */
+  --primary-600: #16644f; /* oscuro para hover/gradients */
+  --accent: #2aa273; /* acento más vivo */
+  --muted: rgba(11,63,57,0.65);
+  --shadow-color: rgba(11,63,57,0.08);
+  color: var(--text);
+  background-color: var(--bg);
   line-height: 1.5;
   font-weight: 400;
   text-rendering: optimizeLegibility;
@@ -15,7 +24,7 @@ a {
 }
 
 a:hover {
-  color: #0b5394;
+  color: var(--primary-600);
 }
 
 * {
@@ -25,7 +34,7 @@ a:hover {
 body {
   margin: 0;
   min-width: 320px;
-  background-color: #fdf8ee;
+  background-color: var(--bg);
 }
 
 main {
@@ -81,7 +90,7 @@ section {
 .page__title {
   font-size: 2.5rem;
   margin-bottom: 0.5rem;
-  color: #0b2e4a;
+  color: var(--primary);
 }
 
 .page__subtitle {
@@ -90,11 +99,11 @@ section {
 }
 
 .card {
-  background: #fff;
+  background: var(--card-bg);
   border-radius: 1.25rem;
   padding: 1.75rem;
-  box-shadow: 0 16px 32px rgba(16, 55, 92, 0.08);
-  border: 1px solid rgba(16, 55, 92, 0.08);
+  box-shadow: 0 16px 32px var(--shadow-color);
+  border: 1px solid rgba(11,63,57,0.06);
 }
 
 .grid-responsive {
@@ -106,9 +115,9 @@ section {
 .empty-state {
   padding: 2rem;
   text-align: center;
-  background: rgba(244, 211, 94, 0.1);
+  background: rgba(11,63,57,0.04);
   border-radius: 1rem;
-  color: rgba(16, 55, 92, 0.7);
+  color: var(--muted);
   font-size: 1.1rem;
 }
 
@@ -135,19 +144,19 @@ section {
 }
 
 .btn--primary {
-  background: linear-gradient(135deg, #184d47, #0b5394);
+  background: linear-gradient(135deg, var(--primary), var(--primary-600));
   color: #fff;
 }
 
 .btn--primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 12px 30px rgba(16, 55, 92, 0.28);
+  box-shadow: 0 12px 30px rgba(11,63,57,0.18);
 }
 
 .btn--ghost {
   background: #fff;
-  border: 1px solid rgba(16, 55, 92, 0.18);
-  color: #184d47;
+  border: 1px solid rgba(11,63,57,0.12);
+  color: var(--primary);
 }
 
 /* Pills/Badges */
@@ -161,12 +170,12 @@ section {
 }
 
 .pill--success {
-  background: rgba(24, 77, 71, 0.1);
-  color: #184d47;
+  background: rgba(42,162,115,0.08);
+  color: var(--accent);
 }
 
 .pill--warning {
-  background: rgba(244, 162, 89, 0.15);
+  background: rgba(244,162,89,0.12);
   color: #c5691f;
 }
 

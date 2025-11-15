@@ -4,7 +4,7 @@
       <header class="auth__header">
         <h1 class="auth__title">Bienvenido</h1>
         <p class="auth__subtitle">
-          Gestiona tus productos, publica nuevas ofertas y mantente conectado con la comunidad de AgroGestor.
+          Gestiona tus productos, publica nuevas ofertas y mantente conectado con la comunidad de MarketVUE.
         </p>
       </header>
 
@@ -55,7 +55,7 @@
     <aside class="auth__aside">
       <h2>Productividad rural sin complicaciones</h2>
       <p>
-        AgroGestor centraliza tus publicaciones, solicitudes y contactos comerciales. Inicia sesión para acceder a herramientas
+        MarketVUE centraliza tus publicaciones, solicitudes y contactos comerciales. Inicia sesión para acceder a herramientas
         diseñadas para productores y feriantes de Chillán.
       </p>
     </aside>
@@ -97,7 +97,7 @@ async function submit() {
   loading.value = true;
   err.value = '';
   try {
-    // En este proyecto de ejemplo el store login es simulado
+  
     await auth.login(email.value, password.value);
     router.push('/explore');
   } catch (e) {

@@ -8,11 +8,13 @@
       </p>
     </header>
 
+    <PostFilters @change="onFiltersChange" />
+
     <div v-if="loading" class="empty-state">Cargando publicaciones...</div>
-    <div v-else-if="items.length === 0" class="empty-state">Aún no hay publicaciones disponibles.</div>
+    <div v-else-if="filtered.length === 0" class="empty-state">Aún no hay publicaciones disponibles.</div>
 
     <div v-else class="grid-responsive">
-      <article v-for="p in items" :key="p.id" class="market-card card">
+      <article v-for="p in filtered" :key="p.id" class="market-card card">
         <img
           v-if="p.imageUrl"
           class="market-card__image"
@@ -39,11 +41,41 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import api from '../services/api';
+import PostFilters from '../components/PostFilters.vue';
 
 const items = ref([]);
 const loading = ref(true);
+
+const filters = ref({ q: '', minPrice: null, maxPrice: null, availability: 'any' });
+
+const filtered = computed(() => {
+  const q = (filters.value.q || '').toString().toLowerCase().trim();
+  return items.value.filter((p) => {
+    if (q) {
+      const match = (p.title + ' ' + (p.description || '')).toLowerCase();
+      if (!match.includes(q)) return false;
+    }
+    if (filters.value.minPrice != null && p.price != null) {
+      if (Number(p.price) < Number(filters.value.minPrice)) return false;
+    }
+    if (filters.value.maxPrice != null && p.price != null) {
+      if (Number(p.price) > Number(filters.value.maxPrice)) return false;
+    }
+    if (filters.value.availability === 'available' && !p.isActive) return false;
+    if (filters.value.availability === 'unavailable' && p.isActive) return false;
+    return true;
+  });
+});
+
+let _filterTimer = null;
+function onFiltersChange(f) {
+  if (_filterTimer) clearTimeout(_filterTimer);
+  _filterTimer = setTimeout(() => {
+    filters.value = { ...f };
+  }, 150);
+}
 const apiBase = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:4000';
 
 const formatter = new Intl.NumberFormat('es-CL', {

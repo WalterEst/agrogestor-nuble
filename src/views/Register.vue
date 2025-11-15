@@ -145,5 +145,5 @@ async function submit() {
   gap: 1.25rem;
 }
 
-/* Reusar estilos locales del proyecto */
+
 </style>
