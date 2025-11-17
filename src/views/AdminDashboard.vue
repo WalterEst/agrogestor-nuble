@@ -8,9 +8,6 @@
           Supervisa la actividad del mercado agrícola, gestiona usuarios y controla las publicaciones desde un único lugar.
         </p>
       </div>
-      <button class="btn btn--ghost dashboard__logout" type="button" @click="handleLogout">
-        Cerrar sesión
-      </button>
     </header>
 
     <div v-if="loading" class="empty-state">Cargando panel...</div>
@@ -22,7 +19,7 @@
           <header class="dashboard__section-header">
             <div>
               <h2>Resumen operativo</h2>
-              <p>Estado global de publicaciones y usuarios aprobados en AgroGestor.</p>
+              <p>Estado global de publicaciones y usuarios aprobados en MarketVue.</p>
             </div>
             <button class="dashboard__reload" type="button" :disabled="reloading" @click="reload">
               {{ reloading ? 'Actualizando...' : 'Actualizar datos' }}
@@ -105,7 +102,7 @@
           </div>
         </section>
 
-        <section class="card dashboard__posts">
+        <section id="panel-posts" class="card dashboard__posts">
           <header class="dashboard__section-header">
             <div>
               <h2>Publicaciones recientes</h2>
@@ -121,6 +118,7 @@
               <span role="columnheader">Precio</span>
               <span role="columnheader">Publicado</span>
               <span role="columnheader" class="dashboard__table-status">Estado</span>
+              <span role="columnheader" class="dashboard__table-rating">Valoración</span>
               <span role="columnheader" class="dashboard__table-actions">Acciones</span>
             </div>
 
@@ -134,18 +132,85 @@
                   {{ post.isActive ? 'Activa' : 'Inactiva' }}
                 </span>
               </span>
+              <span role="cell" class="dashboard__table-rating">
+                <template v-if="post.reviewsCount > 0">
+                  ⭐ {{ formatRating(post.averageRating) }} · {{ post.reviewsCount }}
+                  {{ post.reviewsCount === 1 ? 'opinión' : 'opiniones' }}
+                </template>
+                <template v-else>Sin datos</template>
+              </span>
               <span role="cell" class="dashboard__table-actions">
-                <button
-                  class="btn btn--ghost dashboard__toggle"
-                  type="button"
-                  :disabled="toggling === post.id"
-                  @click="togglePost(post.id)"
-                >
-                  {{ toggling === post.id ? 'Actualizando...' : post.isActive ? 'Pausar' : 'Reactivar' }}
-                </button>
+                <template v-if="editing === post.id">
+                  <button
+                    class="btn btn--ghost"
+                    type="button"
+                    :disabled="savingEdit"
+                    @click="saveEdit(post.id)"
+                  >
+                    {{ savingEdit ? 'Guardando...' : 'Guardar' }}
+                  </button>
+                  <button class="btn btn--ghost" type="button" :disabled="savingEdit" @click="cancelEdit">
+                    Cancelar
+                  </button>
+                </template>
+                <template v-else>
+                  <button
+                    class="btn btn--ghost dashboard__toggle"
+                    type="button"
+                    :disabled="toggling === post.id"
+                    @click="togglePost(post.id)"
+                  >
+                    {{ toggling === post.id ? 'Actualizando...' : post.isActive ? 'Pausar' : 'Reactivar' }}
+                  </button>
+                  <button class="btn btn--ghost" type="button" @click="startEdit(post)">Editar</button>
+                  <button
+                    class="btn btn--ghost btn--danger"
+                    type="button"
+                    :disabled="deleting === post.id"
+                    @click="deletePost(post)"
+                  >
+                    {{ deleting === post.id ? 'Eliminando...' : 'Eliminar' }}
+                  </button>
+                </template>
               </span>
             </div>
           </div>
+
+          <form v-if="editing" class="dashboard__edit-form" @submit.prevent="saveEdit(editing)">
+            <h3>Editar publicación seleccionada</h3>
+            <div class="dashboard__edit-grid">
+              <label>
+                <span>Título</span>
+                <input v-model="editForm.title" type="text" required minlength="3" maxlength="120" />
+              </label>
+              <label>
+                <span>Precio</span>
+                <input
+                  v-model.number="editForm.price"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  required
+                />
+              </label>
+              <label class="dashboard__edit-description">
+                <span>Descripción</span>
+                <textarea v-model="editForm.description" rows="3" maxlength="1000"></textarea>
+              </label>
+              <label class="dashboard__edit-switch">
+                <input v-model="editForm.isActive" type="checkbox" />
+                <span>Mantener publicación activa</span>
+              </label>
+            </div>
+            <div class="dashboard__edit-actions">
+              <button class="btn" type="submit" :disabled="savingEdit">
+                {{ savingEdit ? 'Guardando...' : 'Guardar cambios' }}
+              </button>
+              <button class="btn btn--ghost" type="button" :disabled="savingEdit" @click="cancelEdit">
+                Cancelar
+              </button>
+            </div>
+          </form>
         </section>
 
         <section class="card dashboard__pending">
@@ -177,7 +242,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '../services/api';
 import { useAuth } from '../stores/auth';
@@ -189,6 +254,16 @@ const loading = ref(false);
 const reloading = ref(false);
 const err = ref('');
 const toggling = ref('');
+const editing = ref('');
+const savingEdit = ref(false);
+const deleting = ref('');
+const editForm = reactive({
+  title: '',
+  price: 0,
+  description: '',
+  isActive: true,
+});
+const originalPost = ref(null);
 
 const overview = ref({
   posts: { total: 0, active: 0, inactive: 0 },
@@ -221,6 +296,8 @@ function normalizePost(raw) {
     ...raw,
     price: raw.price != null ? Number(raw.price) : null,
     isActive: raw.isActive === 1 || raw.isActive === true,
+    averageRating: raw.averageRating != null ? Number(raw.averageRating) : null,
+    reviewsCount: Number(raw.reviewsCount ?? 0),
   };
 }
 
@@ -298,20 +375,23 @@ async function togglePost(id) {
     const { data } = await api.patch(`/admin/posts/${id}/toggle`);
     const updated = normalizePost(data);
     posts.value = posts.value.map((item) => (item.id === id ? updated : item));
-
-    if (current.isActive && !updated.isActive) {
-      overview.value.posts.active = Math.max(0, overview.value.posts.active - 1);
-      overview.value.posts.inactive += 1;
-    } else if (!current.isActive && updated.isActive) {
-      overview.value.posts.active += 1;
-      overview.value.posts.inactive = Math.max(0, overview.value.posts.inactive - 1);
-    }
-
+    applyActiveChange(current.isActive, updated.isActive);
     visits.value = generateVisits(overview.value.posts.active);
   } catch (e) {
     err.value = e.response?.data?.error || 'No se pudo actualizar la publicación.';
   } finally {
     toggling.value = '';
+  }
+}
+
+function applyActiveChange(previous, next) {
+  if (previous === next) return;
+  if (previous && !next) {
+    overview.value.posts.active = Math.max(0, overview.value.posts.active - 1);
+    overview.value.posts.inactive += 1;
+  } else if (!previous && next) {
+    overview.value.posts.active += 1;
+    overview.value.posts.inactive = Math.max(0, overview.value.posts.inactive - 1);
   }
 }
 
@@ -325,13 +405,116 @@ function formatDate(value) {
   return dateFormatter.format(new Date(value));
 }
 
-function barHeight(value) {
-  return Math.max(10, Math.round((value / maxVisitValue.value) * 100));
+function formatRating(value) {
+  if (value == null) return '—';
+  return Number(value).toFixed(1);
 }
 
-function handleLogout() {
-  auth.logout();
-  router.replace('/login');
+function resetEditForm() {
+  editForm.title = '';
+  editForm.price = 0;
+  editForm.description = '';
+  editForm.isActive = true;
+  originalPost.value = null;
+  editing.value = '';
+}
+
+function startEdit(post) {
+  editing.value = post.id;
+  editForm.title = post.title;
+  editForm.price = post.price != null ? Number(post.price) : 0;
+  editForm.description = post.description || '';
+  editForm.isActive = post.isActive;
+  originalPost.value = { ...post };
+  err.value = '';
+}
+
+function cancelEdit() {
+  resetEditForm();
+}
+
+async function saveEdit(id) {
+  if (!editing.value || savingEdit.value || !originalPost.value) return;
+
+  const payload = {};
+  const normalizedTitle = editForm.title.trim();
+  if (normalizedTitle && normalizedTitle !== originalPost.value.title) {
+    payload.title = normalizedTitle;
+  }
+
+  const normalizedDescription = (editForm.description || '').trim();
+  if (normalizedDescription !== (originalPost.value.description || '')) {
+    payload.description = normalizedDescription || null;
+  }
+
+  const parsedPrice = Number(editForm.price);
+  if (!Number.isNaN(parsedPrice) && parsedPrice > 0 && parsedPrice !== Number(originalPost.value.price ?? 0)) {
+    payload.price = parsedPrice;
+  }
+
+  if (editForm.isActive !== originalPost.value.isActive) {
+    payload.isActive = editForm.isActive;
+  }
+
+  if (Object.keys(payload).length === 0) {
+    resetEditForm();
+    return;
+  }
+
+  savingEdit.value = true;
+  err.value = '';
+
+  try {
+    const { data } = await api.put(`/admin/posts/${id}`, payload);
+    const updated = normalizePost(data);
+
+    posts.value = posts.value.map((item) => (item.id === id ? updated : item));
+    applyActiveChange(originalPost.value.isActive, updated.isActive);
+    visits.value = generateVisits(overview.value.posts.active);
+
+    resetEditForm();
+  } catch (e) {
+    err.value = e.response?.data?.error || 'No se pudo actualizar la publicación.';
+  } finally {
+    savingEdit.value = false;
+  }
+}
+
+async function deletePost(post) {
+  if (deleting.value) return;
+  if (!window.confirm('¿Seguro que deseas eliminar esta publicación? Esta acción no se puede deshacer.')) {
+    return;
+  }
+
+  deleting.value = post.id;
+  err.value = '';
+
+  try {
+    await api.delete(`/admin/posts/${post.id}`);
+    posts.value = posts.value.filter((item) => item.id !== post.id);
+
+    overview.value.posts.total = Math.max(0, overview.value.posts.total - 1);
+    if (post.isActive) {
+      overview.value.posts.active = Math.max(0, overview.value.posts.active - 1);
+    }
+    overview.value.posts.inactive = Math.max(
+      0,
+      overview.value.posts.total - overview.value.posts.active
+    );
+    visits.value = generateVisits(overview.value.posts.active);
+
+    if (editing.value === post.id) {
+      resetEditForm();
+    }
+  } catch (e) {
+    err.value = e.response?.data?.error || 'No se pudo eliminar la publicación.';
+  } finally {
+    deleting.value = '';
+  }
+}
+
+function barHeight(value) {
+  return Math.max(10, Math.round((value / maxVisitValue.value) * 100));
 }
 
 function goTo(path) {
@@ -355,10 +538,6 @@ onMounted(() => {
   font-weight: 600;
   color: rgba(16, 55, 92, 0.7);
   margin-bottom: 0.5rem;
-}
-
-.dashboard__logout {
-  align-self: flex-start;
 }
 
 .dashboard__error {
@@ -531,11 +710,18 @@ onMounted(() => {
 
 .dashboard__table-row {
   display: grid;
-  grid-template-columns: 2.2fr 1.3fr 1fr 1fr 1fr auto;
+  grid-template-columns: 2.1fr 1.2fr 1fr 1fr 1fr 1.2fr auto;
   gap: 1rem;
   align-items: center;
   padding: 0.9rem 0;
   border-bottom: 1px solid rgba(16, 55, 92, 0.08);
+}
+
+.dashboard__table-rating {
+  color: rgba(16, 55, 92, 0.75);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .dashboard__table-row--head {
@@ -552,6 +738,8 @@ onMounted(() => {
 .dashboard__table-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .dashboard__toggle {
@@ -588,6 +776,66 @@ onMounted(() => {
   color: rgba(16, 55, 92, 0.7);
 }
 
+.btn--danger {
+  color: #9b1b30;
+}
+
+.dashboard__edit-form {
+  margin-top: 1.5rem;
+  display: grid;
+  gap: 1.25rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(16, 55, 92, 0.12);
+}
+
+.dashboard__edit-form h3 {
+  font-size: 1.2rem;
+  color: #10375c;
+}
+
+.dashboard__edit-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.dashboard__edit-grid label {
+  display: grid;
+  gap: 0.5rem;
+  color: rgba(16, 55, 92, 0.75);
+}
+
+.dashboard__edit-grid input,
+.dashboard__edit-grid textarea {
+  border-radius: 0.75rem;
+  border: 1px solid rgba(16, 55, 92, 0.2);
+  padding: 0.55rem 0.75rem;
+  font: inherit;
+}
+
+.dashboard__edit-grid input:focus,
+.dashboard__edit-grid textarea:focus {
+  outline: none;
+  border-color: #184d47;
+  box-shadow: 0 0 0 3px rgba(24, 77, 71, 0.15);
+}
+
+.dashboard__edit-description {
+  grid-column: 1 / -1;
+}
+
+.dashboard__edit-switch {
+  display: flex !important;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dashboard__edit-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .pill--success {
   background: rgba(24, 77, 71, 0.1);
   color: #184d47;
@@ -614,6 +862,7 @@ onMounted(() => {
     grid-template-areas:
       'title title title'
       'seller price status'
+      'rating rating rating'
       'date date actions';
     padding: 1.1rem 0;
   }
@@ -639,6 +888,10 @@ onMounted(() => {
   }
 
   .dashboard__table-row span:nth-child(6) {
+    grid-area: rating;
+  }
+
+  .dashboard__table-row span:nth-child(7) {
     grid-area: actions;
     justify-content: flex-start;
   }
@@ -651,10 +904,6 @@ onMounted(() => {
 @media (max-width: 720px) {
   .dashboard__header {
     flex-direction: column;
-  }
-
-  .dashboard__logout {
-    width: 100%;
   }
 }
 </style>

@@ -2,8 +2,8 @@
   <header class="navbar" :class="{ 'navbar--elevated': isScrolled }">
     <nav class="navbar__content">
       <router-link class="navbar__brand" :to="brandDestination">
-        <span class="navbar__logo" aria-hidden="true">🌱</span>
-        MarketVUE
+        <img class="navbar__logo" :src="logo" alt="MarketVue" />
+        <span class="navbar__brand-name">MarketVue</span>
       </router-link>
 
       <button class="navbar__toggle" @click="toggleMenu" aria-label="Mostrar menú">
@@ -14,29 +14,40 @@
 
       <div class="navbar__links" :class="{ 'navbar__links--open': mobileOpen }">
         <router-link
-          v-if="auth.user?.role === 'SUPERADMIN'"
+          v-if="isSuperAdmin"
           to="/admin/dashboard"
           class="navbar__link"
           active-class="is-active"
         >
-          Panel
-        </router-link>
-        <router-link to="/explore" class="navbar__link" active-class="is-active">Explorar</router-link>
-        <router-link v-if="auth.isLogged" to="/new" class="navbar__link" active-class="is-active">
-          Publicar
-        </router-link>
-        <router-link v-if="auth.isLogged" to="/mine" class="navbar__link" active-class="is-active">
-          Mis publicaciones
+          Panel admin
         </router-link>
         <router-link
-          v-if="auth.user?.role === 'SUPERADMIN'"
+          v-if="isSuperAdmin"
+          :to="{ path: '/admin/dashboard', hash: '#panel-posts' }"
+          class="navbar__link"
+          active-class="is-active"
+        >
+          Gestionar publicaciones
+        </router-link>
+        <router-link
+          v-if="isSuperAdmin"
           to="/admin/users"
           class="navbar__link"
           active-class="is-active"
         >
-          Aprobaciones
+          Usuarios
+        </router-link>
+        <router-link to="/explore" class="navbar__link" active-class="is-active">Explorar</router-link>
+        <router-link v-if="canPublish" to="/new" class="navbar__link" active-class="is-active">
+          Publicar
+        </router-link>
+        <router-link v-if="canPublish" to="/mine" class="navbar__link" active-class="is-active">
+          Mis publicaciones
         </router-link>
 
+        <router-link v-if="!auth.isLogged" to="/register" class="navbar__cta navbar__cta--ghost">
+          Solicitar registro
+        </router-link>
         <router-link v-if="!auth.isLogged" to="/login" class="navbar__cta">Iniciar sesión</router-link>
         <button v-else class="navbar__cta navbar__cta--secondary" @click="logout">Cerrar sesión</button>
       </div>
@@ -48,11 +59,14 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAuth } from '../stores/auth';
+import logo from '../assets/marketvue-logo.svg';
 
 const auth = useAuth();
 const route = useRoute();
 const mobileOpen = ref(false);
 const isScrolled = ref(false);
+const isSuperAdmin = computed(() => auth.user?.role === 'SUPERADMIN');
+const canPublish = computed(() => auth.isApproved);
 
 const brandDestination = computed(() => {
   if (auth.user?.role === 'SUPERADMIN') return '/admin/dashboard';
@@ -116,17 +130,24 @@ watch(
 
 .navbar__brand {
   font-weight: 700;
-  font-size: 1.15rem;
-  letter-spacing: 0.04em;
+  font-size: 1.05rem;
+  letter-spacing: 0.06em;
   text-decoration: none;
   color: #10375c;
   display: inline-flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.5rem;
 }
 
 .navbar__logo {
-  font-size: 1.5rem;
+  height: 2rem;
+  width: auto;
+  display: block;
+}
+
+.navbar__brand-name {
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .navbar__links {
@@ -175,6 +196,17 @@ watch(
   background: #fff;
   color: #184d47;
   border: 1px solid rgba(16, 55, 92, 0.18);
+}
+
+.navbar__cta--ghost {
+  background: transparent;
+  color: #184d47;
+  border: 1px solid rgba(16, 55, 92, 0.18);
+}
+
+.navbar__cta--ghost:hover {
+  background: rgba(24, 77, 71, 0.08);
+  color: #10375c;
 }
 
 .navbar__toggle {
