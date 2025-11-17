@@ -13,7 +13,7 @@ const currentYear = computed(() => new Date().getFullYear())
       <RouterView />
     </main>
     <footer>
-      <p>© {{ currentYear }} AgroGestor. Gestión agrícola inteligente.</p>
+      <p>© {{ currentYear }} MarkeVUE. Gestión agrícola inteligente.</p>
     </footer>
   </div>
 </template>
