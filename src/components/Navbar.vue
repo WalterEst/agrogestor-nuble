@@ -3,7 +3,7 @@
     <nav class="navbar__content">
       <router-link class="navbar__brand" :to="brandDestination">
         <span class="navbar__logo" aria-hidden="true">🌱</span>
-        AgroGestor
+        MarketVUE
       </router-link>
 
       <button class="navbar__toggle" @click="toggleMenu" aria-label="Mostrar menú">

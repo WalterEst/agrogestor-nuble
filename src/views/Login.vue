@@ -19,6 +19,7 @@
             autocomplete="email"
             required
           />
+          <p id="login-email-help" class="input-help" v-if="emailTouched && !emailValid" role="alert" aria-live="polite">Ingresa un correo válido</p>
         </div>
 
         <div class="input-field">
@@ -31,6 +32,7 @@
             autocomplete="current-password"
             required
           />
+          <p id="login-password-help" class="input-help" v-if="passwordTouched && !passwordValid" role="alert" aria-live="polite">La contraseña debe tener al menos 6 caracteres</p>
         </div>
 
         <button class="btn btn--primary" type="submit" :disabled="loading">
@@ -50,7 +52,7 @@
     <aside class="auth__aside">
       <h2>Productividad rural sin complicaciones</h2>
       <p>
-        AgroGestor centraliza tus publicaciones, solicitudes y contactos comerciales. Inicia sesión para acceder a herramientas
+        MarketVUE centraliza tus publicaciones, solicitudes y contactos comerciales. Inicia sesión para acceder a herramientas
         diseñadas para productores y feriantes de Chillán.
       </p>
     </aside>
@@ -93,5 +95,4 @@ async function submit() {
 }
 </script>
 
-<!-- Importa el CSS externo y mantenlo scoped -->
 <style scoped src="./Login.css"></style>
