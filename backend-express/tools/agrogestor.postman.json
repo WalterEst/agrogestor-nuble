@@ -1,8 +1,8 @@
 {
   "info": {
-    "name": "Agrogestor API",
+    "name": "MarketVue API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Colección de endpoints básicos para probar la API de Agrogestor."
+    "description": "Colección de endpoints básicos para probar la API de MarketVue."
   },
   "item": [
     {
@@ -50,7 +50,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"email\": \"admin@agrogestor.local\",\n  \"password\": \"admin123\"\n}"
+          "raw": "{\n  \"email\": \"admin@marketvue.local\",\n  \"password\": \"admin123\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/auth/login",
