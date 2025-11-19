@@ -16,7 +16,7 @@ CREATE TABLE usuarios (
     nombre            VARCHAR(100) NOT NULL,
     apellido          VARCHAR(100),
     email             VARCHAR(150) NOT NULL UNIQUE,
-    password_hash     VARCHAR(255) NOT NULL,
+    passwrd          VARCHAR(255) NOT NULL,
     rol_id            TINYINT UNSIGNED NOT NULL DEFAULT 3,
     estado_registro   ENUM('pendiente','aprobado','rechazado','bloqueado') NOT NULL DEFAULT 'pendiente',
     aprobado_por      INT UNSIGNED,
