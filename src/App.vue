@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { RouterView } from 'vue-router'
-import Navbar from './components/Navbar.vue'
+import Navbar from './componentes/Navbar.vue'
 
 const currentYear = computed(() => new Date().getFullYear())
 </script>
@@ -12,31 +12,35 @@ const currentYear = computed(() => new Date().getFullYear())
     <main class="app-main">
       <RouterView />
     </main>
-    <footer>
+    <footer class="footer">
       <p>© {{ currentYear }} MarkeVUE. Gestión agrícola inteligente.</p>
     </footer>
   </div>
 </template>
 
-<script setup></script>
 
 <style scoped>
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto 1fr auto;
 }
 
 .app-main {
-  padding: 2.5rem 1.5rem 3.5rem;
+  padding: 1.5rem;
   width: min(1080px, 100%);
   margin: 0 auto;
   display: block;
 }
+.footer {
+  padding: 1.25rem 1.5rem 2rem;
+  text-align: center;
+  color: var(--muted);
+}
 
 @media (max-width: 640px) {
   .app-main {
-    padding: 1.75rem 1rem 2.5rem;
+    padding: 1rem;
   }
 }
 </style>
