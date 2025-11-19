@@ -1,25 +1,44 @@
 import express from 'express'
 import cors from 'cors'
+import dotenv from 'dotenv'
 import { body, validationResult } from 'express-validator'
 import mysql from 'mysql2/promise'
 
+dotenv.config()
+
 const app = express()
-const PORT = 3000
+const PORT = process.env.PORT || 3000
 
 app.use(cors())
 app.use(express.json())
 
-// Pool MySQL local
-const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  password: '',
-  database: 'marketplace_db',
-  port: 3306,
+const dbConfig = {
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'marketplace_db',
+  port: Number(process.env.DB_PORT) || 3306,
   waitForConnections: true,
   connectionLimit: 10,
   charset: 'utf8mb4_unicode_ci'
-})
+}
+
+const mockUsers = [
+  {
+    id: 1,
+    nombre: 'Admin',
+    apellido: 'Principal',
+    email: 'admin@marketvue.cl',
+    passwrd: 'Admin123',
+    estado_registro: 'aprobado',
+    rol_id: 1
+  }
+]
+
+const dataSource = {
+  mode: process.env.USE_INMEMORY_AUTH === 'true' ? 'mock' : 'database',
+  pool: null
+}
 
 const formatUser = (user) => ({
   id: user.id,
@@ -30,8 +49,29 @@ const formatUser = (user) => ({
   rol_id: user.rol_id
 })
 
+const bootstrapPool = async () => {
+  if (dataSource.mode === 'mock') return
+
+  try {
+    dataSource.pool = mysql.createPool(dbConfig)
+    await dataSource.pool.query('SELECT 1')
+    console.log('Conexión a MySQL establecida correctamente')
+  } catch (error) {
+    console.warn(
+      'No se pudo establecer la conexión a MySQL. Activando modo mock para autenticación.',
+      error.message
+    )
+    dataSource.mode = 'mock'
+    dataSource.pool = null
+  }
+}
+
 const findUserByEmail = async (email) => {
-  const [rows] = await pool.query(
+    if (dataSource.mode === 'mock') {
+    const user = mockUsers.find((item) => item.email === email)
+    return user || null
+  }
+  const [rows] = await dataSource.pool.query(
     `SELECT id, nombre, apellido, email, passwrd, estado_registro, rol_id
      FROM usuarios WHERE email = ? LIMIT 1`,
     [email]
@@ -40,8 +80,12 @@ const findUserByEmail = async (email) => {
 }
 
 app.get('/api/health', async (_req, res) => {
+  if (dataSource.mode === 'mock') {
+    return res.json({ status: 'ok', mode: 'mock' })
+  }
+
   try {
-    await pool.query('SELECT 1')
+    await dataSource.pool.query('SELECT 1')
     return res.json({ status: 'ok', mode: 'database' })
   } catch (error) {
     console.error('Error en healthcheck de base de datos:', error.message)
@@ -67,12 +111,14 @@ app.post(
         return res.status(401).json({ message: 'Credenciales incorrectas' })
       }
 
-      await pool.query('UPDATE usuarios SET ultimo_login = NOW() WHERE id = ?', [user.id])
+      if (dataSource.mode === 'database') {
+        await dataSource.pool.query('UPDATE usuarios SET ultimo_login = NOW() WHERE id = ?', [user.id])
+      }
 
       return res.json({
         message: 'Inicio de sesión exitoso',
         usuario: formatUser(user),
-        origen: 'database'
+        origen: dataSource.mode
       })
     } catch (error) {
       console.error('Error en login:', error)
@@ -81,6 +127,8 @@ app.post(
   }
 )
 
-app.listen(PORT, () => {
-  console.log(`API de MarkeVUE escuchando en http://localhost:${PORT}`)
+bootstrapPool().finally(() => {
+  app.listen(PORT, () => {
+    console.log(`API de MarkeVUE escuchando en http://localhost:${PORT}`)
+  })
 })
