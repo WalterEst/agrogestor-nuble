@@ -1,11 +1,13 @@
 <script setup>
-import { reactive, ref, computed } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 
 const usuarios = ref([])
 const solicitudesPublicacion = ref([])
 const publicaciones = ref([])
 const notasModeracion = ref('')
 const mensajeSistema = ref('')
+const cargando = ref(false)
+const apiBase = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:3000/api'
 
 const filtrosUsuarios = reactive({
   busqueda: '',
@@ -24,6 +26,7 @@ const filtrosPublicaciones = reactive({
 })
 
 const usuarioEditado = reactive({
+  id: null,
   nombre: '',
   email: '',
   rol: '',
@@ -46,8 +49,77 @@ const registrarAccion = (texto) => {
   }, 3200)
 }
 
-const enviarCambiosUsuario = () => {
-  registrarAccion('Cambios listos para enviarse cuando se conecte el backend.')
+const sincronizarDashboard = async () => {
+  cargando.value = true
+  try {
+    const response = await fetch(`${apiBase}/admin/dashboard`)
+    const payload = await response.json().catch(() => ({}))
+
+    if (!response.ok) {
+      throw new Error(payload?.message || 'No pudimos cargar los datos del panel')
+    }
+
+    usuarios.value = Array.isArray(payload.usuarios) ? payload.usuarios : []
+    solicitudesPublicacion.value = Array.isArray(payload.solicitudes)
+      ? payload.solicitudes
+      : []
+    publicaciones.value = Array.isArray(payload.publicaciones) ? payload.publicaciones : []
+
+    registrarAccion('Datos del panel sincronizados con backend.')
+  } catch (error) {
+    registrarAccion(error.message || 'Error al cargar datos. Revisa la conexión con el backend.')
+  } finally {
+    cargando.value = false
+  }
+}
+
+const seleccionarUsuario = (usuario) => {
+  usuarioEditado.id = usuario.id || null
+  usuarioEditado.nombre = usuario.nombre || ''
+  usuarioEditado.email = usuario.email || ''
+  usuarioEditado.rol = usuario.rol_id ?? usuario.rol ?? ''
+  usuarioEditado.telefono = usuario.telefono || ''
+  usuarioEditado.ubicacion = usuario.ubicacion || ''
+  usuarioEditado.estado = usuario.estado || ''
+  usuarioEditado.notas = ''
+  registrarAccion('Usuario cargado para edición. Realiza los cambios y guarda.')
+}
+
+const enviarCambiosUsuario = async () => {
+  if (!usuarioEditado.id) {
+    registrarAccion('Selecciona un usuario de la lista para editarlo.')
+    return
+  }
+
+  const payload = {
+    nombre: usuarioEditado.nombre?.trim() || undefined,
+    email: usuarioEditado.email?.trim() || undefined,
+    estado_registro: usuarioEditado.estado || undefined,
+    rol_id: usuarioEditado.rol ? Number(usuarioEditado.rol) : undefined
+  }
+
+  try {
+    const response = await fetch(`${apiBase}/admin/usuarios/${usuarioEditado.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+
+    const data = await response.json().catch(() => ({}))
+
+    if (!response.ok) {
+      throw new Error(data?.message || 'No se pudieron guardar los cambios')
+    }
+
+    const index = usuarios.value.findIndex((usuario) => usuario.id === usuarioEditado.id)
+    if (index !== -1 && data.usuario) {
+      usuarios.value.splice(index, 1, data.usuario)
+    }
+
+    registrarAccion('Usuario actualizado correctamente en el backend.')
+  } catch (error) {
+    registrarAccion(error.message || 'Error al guardar. Intenta nuevamente.')
+  }
 }
 
 const procesarRevision = (decision) => {
@@ -56,6 +128,8 @@ const procesarRevision = (decision) => {
     : 'Solicitud marcada para rechazo.'
   registrarAccion(`${texto} Agrega notas para documentar la decisión.`)
 }
+
+onMounted(sincronizarDashboard)
 </script>
 
 <template>
@@ -64,11 +138,11 @@ const procesarRevision = (decision) => {
       <div>
         <p class="pill pill--success">Panel administrador</p>
         <h1>Gestión centralizada de MarkeVUE</h1>
-        <p class="muted">
-          Supervisa usuarios, valida publicaciones y administra la información de la plataforma desde un solo lugar.
-          Esta interfaz funciona sin conexión a backend; cuando no existan datos verás los estados vacíos.
-        </p>
-      </div>
+          <p class="muted">
+            Supervisa usuarios, valida publicaciones y administra la información de la plataforma desde un solo lugar.
+            Los datos se cargan desde el backend cuando está disponible; si no hay registros verás los estados vacíos.
+          </p>
+        </div>
       <div class="hero__actions">
         <button class="btn btn--primary" type="button" @click="registrarAccion('Acción rápida programada para ejecutarse con el backend.')">
           Crear rol o permiso
@@ -104,7 +178,9 @@ const procesarRevision = (decision) => {
           <p class="muted">Filtra, edita y actualiza los datos de cuentas existentes.</p>
         </div>
         <div class="panel__actions">
-          <button class="btn btn--ghost" type="button" @click="registrarAccion('Importación pendiente de backend.')">Importar</button>
+          <button class="btn btn--ghost" type="button" @click="sincronizarDashboard" :disabled="cargando">
+            {{ cargando ? 'Sincronizando...' : 'Refrescar datos' }}
+          </button>
           <button class="btn btn--primary" type="button" @click="registrarAccion('Exportación pendiente de backend.')">Exportar</button>
         </div>
       </header>
@@ -116,13 +192,13 @@ const procesarRevision = (decision) => {
         </label>
         <label class="field">
           <span>Rol</span>
-          <select v-model="filtrosUsuarios.rol">
-            <option value="">Todos</option>
-            <option value="superadmin">Superadministrador</option>
-            <option value="admin">Administrador</option>
-            <option value="vendedor">Vendedor</option>
-          </select>
-        </label>
+            <select v-model="filtrosUsuarios.rol">
+              <option value="">Todos</option>
+              <option value="1">Superadministrador</option>
+              <option value="2">Administrador</option>
+              <option value="3">Vendedor</option>
+            </select>
+          </label>
         <label class="field">
           <span>Estado</span>
           <select v-model="filtrosUsuarios.estado">
@@ -145,7 +221,7 @@ const procesarRevision = (decision) => {
               {{ usuario.estado || 'sin estado' }}
             </span>
             <div class="list__buttons">
-              <button class="btn btn--ghost" type="button" @click="registrarAccion('Edición de usuario pendiente de datos reales.')">Editar</button>
+              <button class="btn btn--ghost" type="button" @click="seleccionarUsuario(usuario)">Editar</button>
               <button class="btn btn--ghost" type="button" @click="registrarAccion('Usuario marcado para bloqueo o eliminación.')">Bloquear/Eliminar</button>
             </div>
           </div>
@@ -186,9 +262,9 @@ const procesarRevision = (decision) => {
               <span>Rol</span>
               <select v-model="usuarioEditado.rol">
                 <option value="">Selecciona un rol</option>
-                <option value="superadmin">Superadministrador</option>
-                <option value="admin">Administrador</option>
-                <option value="vendedor">Vendedor</option>
+                <option value="1">Superadministrador</option>
+                <option value="2">Administrador</option>
+                <option value="3">Vendedor</option>
               </select>
             </label>
             <label class="field">

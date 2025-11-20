@@ -67,7 +67,7 @@ const bootstrapPool = async () => {
 }
 
 const findUserByEmail = async (email) => {
-    if (dataSource.mode === 'mock') {
+  if (dataSource.mode === 'mock') {
     const user = mockUsers.find((item) => item.email === email)
     return user || null
   }
@@ -77,6 +77,15 @@ const findUserByEmail = async (email) => {
     [email]
   )
   return rows[0] || null
+}
+
+const buildUpdateQuery = (fields = {}) => {
+  const entries = Object.entries(fields).filter(([, value]) => value !== undefined)
+  if (!entries.length) return null
+
+  const setClause = entries.map(([key]) => `${key} = ?`).join(', ')
+  const values = entries.map(([, value]) => value)
+  return { setClause, values }
 }
 
 app.get('/api/health', async (_req, res) => {
@@ -123,6 +132,139 @@ app.post(
     } catch (error) {
       console.error('Error en login:', error)
       return res.status(500).json({ message: 'Error interno del servidor' })
+    }
+  }
+)
+
+app.get('/api/admin/dashboard', async (_req, res) => {
+  if (dataSource.mode === 'mock') {
+    return res.json({
+      usuarios: mockUsers.map((user) => ({
+        id: user.id,
+        nombre: user.nombre,
+        apellido: user.apellido,
+        email: user.email,
+        estado: user.estado_registro,
+        rol: 'superusuario',
+        rol_id: user.rol_id,
+        ultimo_login: null
+      })),
+      solicitudes: [],
+      publicaciones: []
+    })
+  }
+
+  try {
+    const [usuarios] = await dataSource.pool.query(
+      `SELECT u.id,
+              u.nombre,
+              u.apellido,
+              u.email,
+              u.estado_registro AS estado,
+              u.rol_id,
+              COALESCE(r.nombre, '') AS rol,
+              DATE_FORMAT(u.ultimo_login, '%Y-%m-%d %H:%i:%s') AS ultimo_login
+         FROM usuarios u
+    LEFT JOIN roles r ON u.rol_id = r.id
+     ORDER BY u.id`
+    )
+
+    const [solicitudes] = await dataSource.pool.query(
+      `SELECT p.id,
+              p.titulo,
+              COALESCE(CONCAT(u.nombre, ' ', u.apellido), 'Sin autor') AS autor,
+              COALESCE(c.nombre, 'Sin categoría') AS categoria,
+              DATE_FORMAT(p.creado_en, '%Y-%m-%d') AS fecha
+         FROM publicaciones p
+    LEFT JOIN usuarios u ON p.usuario_id = u.id
+    LEFT JOIN categorias c ON p.categoria_id = c.id
+        WHERE p.estado_publicacion = 'pendiente_revision'
+     ORDER BY p.creado_en DESC
+        LIMIT 50`
+    )
+
+    const [publicaciones] = await dataSource.pool.query(
+      `SELECT p.id,
+              p.titulo,
+              COALESCE(CONCAT(u.nombre, ' ', u.apellido), 'Sin autor') AS autor,
+              DATE_FORMAT(p.creado_en, '%Y-%m-%d') AS fecha,
+              p.estado_publicacion AS visibilidad
+         FROM publicaciones p
+    LEFT JOIN usuarios u ON p.usuario_id = u.id
+     ORDER BY p.creado_en DESC
+        LIMIT 100`
+    )
+
+    return res.json({ usuarios, solicitudes, publicaciones })
+  } catch (error) {
+    console.error('Error obteniendo datos de dashboard:', error.message)
+    return res.status(500).json({ message: 'Error al cargar datos del panel' })
+  }
+})
+
+app.put(
+  '/api/admin/usuarios/:id',
+  [
+    body('nombre').optional().isLength({ min: 2 }).withMessage('Nombre demasiado corto'),
+    body('apellido').optional().isLength({ min: 2 }).withMessage('Apellido demasiado corto'),
+    body('email').optional().isEmail().withMessage('Correo inválido'),
+    body('estado_registro')
+      .optional()
+      .isIn(['pendiente', 'aprobado', 'rechazado', 'bloqueado'])
+      .withMessage('Estado no permitido'),
+    body('rol_id').optional().isInt({ min: 1 }).withMessage('Rol inválido')
+  ],
+  async (req, res) => {
+    if (dataSource.mode === 'mock') {
+      return res.status(503).json({ message: 'Edición no disponible en modo mock' })
+    }
+
+    const errors = validationResult(req)
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ message: 'Datos inválidos', errors: errors.array() })
+    }
+
+    const { id } = req.params
+    const { nombre, apellido, email, estado_registro, rol_id } = req.body
+    const update = buildUpdateQuery({ nombre, apellido, email, estado_registro, rol_id })
+
+    if (!update) {
+      return res.status(400).json({ message: 'No se enviaron campos para actualizar' })
+    }
+
+    try {
+      const [result] = await dataSource.pool.query(
+        `UPDATE usuarios
+            SET ${update.setClause}, actualizado_en = NOW()
+          WHERE id = ?
+          LIMIT 1`,
+        [...update.values, id]
+      )
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'Usuario no encontrado' })
+      }
+
+      const [rows] = await dataSource.pool.query(
+        `SELECT u.id,
+                u.nombre,
+                u.apellido,
+                u.email,
+                u.estado_registro AS estado,
+                u.rol_id,
+                COALESCE(r.nombre, '') AS rol,
+                DATE_FORMAT(u.ultimo_login, '%Y-%m-%d %H:%i:%s') AS ultimo_login
+           FROM usuarios u
+      LEFT JOIN roles r ON u.rol_id = r.id
+          WHERE u.id = ?
+          LIMIT 1`,
+        [id]
+      )
+
+      return res.json({ message: 'Usuario actualizado', usuario: rows[0] })
+    } catch (error) {
+      console.error('Error actualizando usuario:', error.message)
+      return res.status(500).json({ message: 'No fue posible actualizar el usuario' })
     }
   }
 )
