@@ -106,28 +106,6 @@ const findUserByEmail = async (email) => {
   return rows[0] || null
 }
 
-const formatPublicationRow = (row) => ({
-  id: row.id,
-  titulo: row.titulo,
-  descripcion: row.descripcion,
-  precio: Number(row.precio),
-  moneda: row.moneda,
-  categoria: row.categoria,
-  autor: row.autor,
-  fecha: row.fecha,
-  estado_publicacion: row.estado_publicacion,
-  portada: row.portada
-})
-
-const buildUpdateQuery = (fields = {}) => {
-  const entries = Object.entries(fields).filter(([, value]) => value !== undefined)
-  if (!entries.length) return null
-
-  const setClause = entries.map(([key]) => `${key} = ?`).join(', ')
-  const values = entries.map(([, value]) => value)
-  return { setClause, values }
-}
-
 app.get('/api/health', async (_req, res) => {
   if (dataSource.mode === 'mock') {
     return res.json({ status: 'ok', mode: 'mock' })
