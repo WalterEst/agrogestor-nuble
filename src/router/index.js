@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '../componentes/Login.vue'
+import RegistroView from '../componentes/Registro.vue'
 import AdminDashboard from '../componentes/AdminDashboard.vue'
 import ProductosPublicos from '../componentes/ProductosPublicos.vue'
 import DetalleProducto from '../componentes/DetalleProducto.vue'
@@ -14,6 +15,12 @@ const routes = [
     name: 'login',
     component: LoginView,
     meta: { title: 'Ingresa a MarketVue' }
+  },
+  {
+    path: '/register',
+    name: 'register',
+    component: RegistroView,
+    meta: { title: 'Registro | MarketVUE' }
   },
   {
     path: '/productos',

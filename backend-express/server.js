@@ -282,6 +282,70 @@ app.get('/api/publicaciones/:id', async (req, res) => {
 })
 
 // Endpoint de login
+// Endpoint de registro
+app.post(
+  '/api/auth/register',
+  [
+    body('nombre').isLength({ min: 2 }),
+    body('email').isEmail(),
+    body('passwrd').isLength({ min: 6 })
+  ],
+  async (req, res) => {
+    const errors = validationResult(req)
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ message: 'Datos inválidos', errors: errors.array() })
+    }
+
+    const { nombre, apellido, email, passwrd } = req.body
+
+    try {
+      // En modo mock simplemente añadimos al arreglo
+      if (dataSource.mode === 'mock') {
+        const newId = mockUsers.length ? Math.max(...mockUsers.map(u => u.id)) + 1 : 1
+        const user = {
+          id: newId,
+          nombre,
+          apellido: apellido || '',
+          email,
+          passwrd,
+          estado_registro: process.env.AUTO_APPROVE_REGISTRATION === 'true' ? 'aprobado' : 'pendiente',
+          rol_id: 3
+        }
+        mockUsers.push(user)
+        return res.status(201).json({ message: 'Usuario creado', usuario: formatUser(user), origen: 'mock' })
+      }
+
+      // Verificar si email ya existe
+      const [exists] = await dataSource.pool.query(
+        'SELECT id FROM usuarios WHERE email = ? LIMIT 1',
+        [email]
+      )
+      if (exists.length) {
+        return res.status(409).json({ message: 'El correo ya está registrado' })
+      }
+
+      // Inserta usuario (por defecto rol 3 - usuario)
+      const estadoRegistro = process.env.AUTO_APPROVE_REGISTRATION === 'true' ? 'aprobado' : 'pendiente'
+      const [result] = await dataSource.pool.query(
+        `INSERT INTO usuarios (nombre, apellido, email, passwrd, rol_id, estado_registro, creado_en)
+         VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+        [nombre, apellido || '', email, passwrd, 3, estadoRegistro]
+      )
+
+      const [rows] = await dataSource.pool.query(
+        `SELECT id, nombre, apellido, email, estado_registro, rol_id FROM usuarios WHERE id = ? LIMIT 1`,
+        [result.insertId]
+      )
+
+      return res.status(201).json({ message: 'Usuario creado', usuario: formatUser(rows[0]), origen: 'database' })
+    } catch (error) {
+      console.error('Error en registro:', error.message)
+      return res.status(500).json({ message: 'Error al crear el usuario' })
+    }
+  }
+)
+
+// Endpoint de login
 app.post(
   '/api/auth/login',
   [
