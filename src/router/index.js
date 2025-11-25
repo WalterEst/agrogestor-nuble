@@ -1,11 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '../componentes/Login.vue'
 import AdminDashboard from '../componentes/AdminDashboard.vue'
+import ProductosPublicos from '../componentes/ProductosPublicos.vue'
+import DetalleProducto from '../componentes/DetalleProducto.vue'
 
 const routes = [
   {
     path: '/',
-    redirect: '/login'
+    redirect: '/productos'
   },
   {
     path: '/login',
@@ -14,11 +16,23 @@ const routes = [
     meta: { title: 'Ingresa a MarketVue' }
   },
   {
-      path: '/admin',
-      name: 'admin',
-      component: AdminDashboard,
-      meta: { title: 'Panel administrador | MarketVUE' }
-    }
+    path: '/productos',
+    name: 'productos',
+    component: ProductosPublicos,
+    meta: { title: 'Catálogo de productos | MarketVUE' }
+  },
+  {
+    path: '/productos/:id',
+    name: 'detalle-producto',
+    component: DetalleProducto,
+    meta: { title: 'Detalles del producto | MarketVUE' }
+  },
+  {
+    path: '/admin',
+    name: 'admin',
+    component: AdminDashboard,
+    meta: { title: 'Panel administrador | MarketVUE' }
+  }
 ]
 
 const router = createRouter({

@@ -194,6 +194,93 @@ app.get('/api/publicaciones', async (_req, res) => {
   }
 })
 
+// Endpoint para obtener detalle de una publicación específica con datos del vendedor
+app.get('/api/publicaciones/:id', async (req, res) => {
+  const { id } = req.params
+
+  if (dataSource.mode === 'mock') {
+    const producto = mockPublicaciones.find(p => p.id == id)
+    if (!producto) {
+      return res.status(404).json({ message: 'Producto no encontrado' })
+    }
+    
+    return res.json({
+      publicacion: {
+        ...producto,
+        vendedor: {
+          nombre: mockUsers[0].nombre,
+          apellido: mockUsers[0].apellido,
+          email: mockUsers[0].email,
+          estado_registro: mockUsers[0].estado_registro
+        }
+      }
+    })
+  }
+
+  try {
+    // Consulta el producto específico con datos del vendedor
+    const [rows] = await dataSource.pool.query(
+      `SELECT p.id,
+              p.titulo,
+              p.descripcion,
+              p.precio,
+              p.moneda,
+              COALESCE(c.nombre, 'Sin categoría') AS categoria,
+              TRIM(CONCAT(COALESCE(u.nombre, ''), ' ', COALESCE(u.apellido, ''))) AS autor,
+              DATE_FORMAT(p.creado_en, '%Y-%m-%d') AS fecha,
+              p.estado_publicacion,
+              u.id AS vendedor_id,
+              u.nombre AS vendedor_nombre,
+              u.apellido AS vendedor_apellido,
+              u.email AS vendedor_email,
+              u.estado_registro AS vendedor_estado,
+              (
+                SELECT img.ruta_imagen
+                FROM publicaciones_imagenes img
+                WHERE img.publicacion_id = p.id
+                ORDER BY img.es_portada DESC, img.orden ASC, img.id ASC
+                LIMIT 1
+              ) AS portada
+         FROM publicaciones p
+    LEFT JOIN usuarios u ON p.usuario_id = u.id
+    LEFT JOIN categorias c ON p.categoria_id = c.id
+        WHERE p.id = ? AND p.visible = 1 AND p.estado_publicacion = 'publicada'
+        LIMIT 1`,
+      [id]
+    )
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Producto no encontrado' })
+    }
+
+    const row = rows[0]
+    const publicacion = {
+      id: row.id,
+      titulo: row.titulo,
+      descripcion: row.descripcion,
+      precio: row.precio,
+      moneda: row.moneda,
+      categoria: row.categoria,
+      autor: row.autor,
+      fecha: row.fecha,
+      estado_publicacion: row.estado_publicacion,
+      portada: row.portada,
+      vendedor: {
+        id: row.vendedor_id,
+        nombre: row.vendedor_nombre,
+        apellido: row.vendedor_apellido,
+        email: row.vendedor_email,
+        estado_registro: row.vendedor_estado
+      }
+    }
+
+    return res.json({ publicacion })
+  } catch (error) {
+    console.error('Error obteniendo detalle de publicación:', error.message)
+    return res.status(500).json({ message: 'Error al cargar los detalles del producto' })
+  }
+})
+
 // Endpoint de login
 app.post(
   '/api/auth/login',
