@@ -1,6 +1,7 @@
 <script setup>
 import { reactive, ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
+import { useSessionStore } from '../stores/session'
 
 const form = reactive({
   email: '',
@@ -11,6 +12,8 @@ const loading = ref(false)
 const feedback = ref(null)
 const apiBase = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:3000/api'
 const router = useRouter()
+const route = useRoute()
+const sessionStore = useSessionStore()
 const adminRoles = [1, 2]
 
 const emailValid = computed(() =>
@@ -41,8 +44,8 @@ const handleSubmit = async () => {
     const nombre = payload?.usuario?.nombre || 'a MarkeVUE'
     const roleId = Number(payload?.usuario?.rol_id)
     const isAdmin = adminRoles.includes(roleId)
-    const estado = payload?.usuario?.estado_registro || 'pendiente'    
-    localStorage.setItem('marketvue.session', JSON.stringify(payload))
+    const estado = payload?.usuario?.estado_registro || 'pendiente'
+    sessionStore.setSession(payload)
     feedback.value = {
       type: 'success',
             text: isAdmin
@@ -50,9 +53,19 @@ const handleSubmit = async () => {
         : `¡Bienvenido ${nombre}! Estado de tu cuenta: ${estado}.`
     }
 
+    const redirectPath = route.query.redirect
+
     if (isAdmin) {
       await router.push({ name: 'admin' })
+      return
     }
+
+    if (typeof redirectPath === 'string' && redirectPath) {
+      await router.replace(redirectPath)
+      return
+    }
+    
+    await router.push({ name: 'publicaciones' })
   } catch (error) {
     feedback.value = {
       type: 'error',

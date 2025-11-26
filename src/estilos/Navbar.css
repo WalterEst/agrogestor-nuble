@@ -58,6 +58,12 @@
   background: rgba(11, 63, 57, 0.04);
 }
 
+.navbar__button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
 .navbar__cta {
   padding: 0.65rem 1.2rem;
   border-radius: 12px;

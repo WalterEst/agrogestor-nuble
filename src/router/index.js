@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { readSessionFromStorage } from '../stores/session'
 
 // 1. IMPORTACIONES GENERALES (Nombres de archivo originales)
 import LoginView from '../componentes/Login.vue'
@@ -49,14 +50,18 @@ const routes = [
     path: '/admin',
     name: 'admin',
     component: AdminDashboard,
-    meta: { title: 'Panel Administrador' }
+    meta: {
+      title: 'Panel Administrador',
+      authRequired: true,
+      allowedRoles: [1, 2, 'admin', 'administrador', 'moderador', 'moderator']
+    }
   },
 
   // --- RUTAS PROTEGIDAS DEL PUBLICADOR ---
   {
     path: '/panel/publicador',
     component: DashboardLayout,
-    meta: { authRequired: true, allowedRoles: ['publisher'] },
+    meta: { authRequired: true, allowedRoles: ['publisher', 'publicador', 'vendedor', 3] },
     children: [
       {
         path: 'mis-productos', // URL: /panel/publicador/mis-productos
@@ -93,6 +98,43 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+const userHasAllowedRole = (user, allowedRoles) => {
+  if (!allowedRoles.length) return true
+
+  const roleId = Number(user?.rol_id ?? user?.rolId ?? user?.roleId)
+  const roleName = String(user?.rol ?? user?.role ?? '').toLowerCase()
+
+  return allowedRoles.some((role) => {
+    if (typeof role === 'number') {
+      return roleId === Number(role)
+    }
+
+    if (typeof role === 'string') {
+      return roleName === role.toLowerCase()
+    }
+
+    return false
+  })
+}
+
+router.beforeEach((to) => {
+  const requiresAuth = to.matched.some((record) => record.meta?.authRequired)
+  const allowedRoles = to.matched.flatMap((record) => record.meta?.allowedRoles ?? [])
+  const session = readSessionFromStorage()
+  const user = session?.usuario
+  const isAuthenticated = Boolean(user)
+
+  if (requiresAuth && !isAuthenticated) {
+    return { name: 'login', query: { redirect: to.fullPath } }
+  }
+
+  if (allowedRoles.length && (!isAuthenticated || !userHasAllowedRole(user, allowedRoles))) {
+    return { name: 'publicaciones' }
+  }
+
+  return true
 })
 
 router.afterEach((to) => {
