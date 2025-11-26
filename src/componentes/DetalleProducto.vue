@@ -104,10 +104,10 @@ onMounted(() => {
 
           <div class="meta-info">
             <span class="categoria" v-if="producto.categoria">
-              📦 {{ producto.categoria }}
+               {{ producto.categoria }}
             </span>
             <span class="fecha">
-              📅 {{ formatearFecha(producto.fecha) }}
+               {{ formatearFecha(producto.fecha) }}
             </span>
           </div>
 
@@ -122,7 +122,7 @@ onMounted(() => {
 
           <div class="acciones">
             <button class="btn-comprar">
-              🛒 Contactar con el vendedor
+               Contactar con el vendedor
             </button>
           </div>
 
@@ -175,10 +175,10 @@ onMounted(() => {
 
           <div class="vendedor-acciones">
             <button class="btn-contactar" v-if="producto.vendedor?.email">
-              ✉️ Enviar mensaje
+               Enviar mensaje
             </button>
             <button class="btn-seguir">
-              ⭐ Seguir vendedor
+               Seguir vendedor
             </button>
           </div>
         </div>

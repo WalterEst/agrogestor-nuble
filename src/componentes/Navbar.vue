@@ -10,6 +10,7 @@
     <nav class="navbar__links">
   <RouterLink to="/login" class="navbar__link">Ingresar</RouterLink>
   <RouterLink to="/admin" class="navbar__link">Administrador</RouterLink>
+  <RouterLink to="/productos" class="navbar__link">Productos</RouterLink>
   <RouterLink to="/register" class="navbar__cta">Crear cuenta</RouterLink>
     </nav>
   </header>
