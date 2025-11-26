@@ -1,60 +1,92 @@
 import { createRouter, createWebHistory } from 'vue-router'
+
+// 1. IMPORTACIONES GENERALES (Nombres de archivo originales)
 import LoginView from '../componentes/Login.vue'
 import RegistroView from '../componentes/Registro.vue'
 import AdminDashboard from '../componentes/AdminDashboard.vue'
-import Publicaciones from '../componentes/Publicaciones.vue'
+import ProductosPublicos from '../componentes/ProductosPublicos.vue' 
+import DetalleProducto from '../componentes/DetalleProducto.vue'
+
+// 2. IMPORTACIONES DEL DASHBOARD PUBLICADOR
 import DashboardLayout from '../layouts/DashboardLayout.vue'
 import MyProductsView from '../views/dashboard/publisher/MyProductsView.vue'
 import ProductFormView from '../views/dashboard/publisher/ProductFormView.vue'
 import ProductDetailView from '../views/dashboard/publisher/ProductDetailView.vue'
 
 const routes = [
+  // --- RUTAS PÚBLICAS ---
   {
     path: '/',
-        redirect: '/publicaciones'
+    redirect: '/publicaciones' // Redirección corregida
   },
   {
-    path: '/publicaciones',
+    path: '/publicaciones', // URL visible: /publicaciones
     name: 'publicaciones',
-    component: Publicaciones,
-    meta: { title: 'Publicaciones | MarkeVUE' }
+    component: ProductosPublicos,
+    meta: { title: 'Catálogo de Publicaciones | MarketVUE' }
+  },
+  {
+    path: '/publicaciones/:id', // URL visible: /publicaciones/5
+    name: 'detalle-publicacion',
+    component: DetalleProducto,
+    meta: { title: 'Detalle de la Publicación | MarketVUE' }
   },
   {
     path: '/login',
     name: 'login',
     component: LoginView,
     meta: { title: 'Ingresa a MarketVue' }
-    },
+  },
+  {
+    path: '/register',
+    name: 'register',
+    component: RegistroView,
+    meta: { title: 'Registro | MarketVUE' }
+  },
+
+  // --- RUTA ADMINISTRADOR ---
   {
     path: '/admin',
     name: 'admin',
     component: AdminDashboard,
-    meta: { title: 'Panel administrador | MarketVUE' }
-    },
+    meta: { title: 'Panel Administrador' }
+  },
+
+  // --- RUTAS PROTEGIDAS DEL PUBLICADOR ---
   {
     path: '/panel/publicador',
-    component: () => import('../layouts/DashboardLayout.vue'), 
+    component: DashboardLayout,
     meta: { authRequired: true, allowedRoles: ['publisher'] },
     children: [
-    {
-      path: 'mis-productos',
-      name: 'publisher-products',
-      component: () => import('../views/dashboard/publisher/MyProductsView.vue')
-    },
-    {
-      path: 'producto/editar/:id',
-      name: 'publisher-edit-product',
-      component: () => import('../views/dashboard/publisher/ProductFormView.vue'),
-      props: true
-    },
-    {
-      path: 'producto/detalle/:id',
-      name: 'publisher-product-detail',
-      component: () => import('../views/dashboard/publisher/ProductDetailView.vue'),
-      props: true
-    }
+      {
+        path: 'mis-publicaciones', // URL: /panel/publicador/mis-publicaciones
+        name: 'publisher-products', // Mantenemos el name interno por si acaso
+        component: MyProductsView,
+        meta: { title: 'Mis Publicaciones' }
+      },
+      {
+        path: 'publicacion/nueva',
+        name: 'publisher-create-product',
+        component: ProductFormView,
+        props: { id: null },
+        meta: { title: 'Nueva Publicación' }
+      },
+      {
+        path: 'publicacion/editar/:id',
+        name: 'publisher-edit-product',
+        component: ProductFormView,
+        props: true,
+        meta: { title: 'Editar Publicación' }
+      },
+      {
+        path: 'publicacion/detalle/:id',
+        name: 'publisher-product-detail',
+        component: ProductDetailView,
+        props: true,
+        meta: { title: 'Detalle de Publicación' }
+      }
     ]
-}
+  }
 ]
 
 const router = createRouter({
