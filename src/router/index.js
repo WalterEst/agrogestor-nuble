@@ -8,6 +8,7 @@ import AdminDashboard from '../componentes/AdminDashboard.vue'
 import ProductosPublicos from '../componentes/ProductosPublicos.vue' 
 import DetalleProducto from '../componentes/DetalleProducto.vue'
 import AdminUserDetailView from '../views/AdminUserDetailView.vue'
+import AdminPublicationDetailView from '../views/AdminPublicationDetailView.vue'
 
 // 2. IMPORTACIONES DEL DASHBOARD PUBLICADOR
 import DashboardLayout from '../layouts/DashboardLayout.vue'
@@ -53,6 +54,17 @@ const routes = [
     component: AdminDashboard,
     meta: {
       title: 'Panel Administrador',
+      authRequired: true,
+      allowedRoles: [1, 2, 'admin', 'administrador', 'moderador', 'moderator']
+    }
+  },
+    {
+    path: '/admin/publicaciones/:id',
+    name: 'admin-publication-detail',
+    component: AdminPublicationDetailView,
+    props: true,
+    meta: {
+      title: 'Detalle de publicación',
       authRequired: true,
       allowedRoles: [1, 2, 'admin', 'administrador', 'moderador', 'moderator']
     }

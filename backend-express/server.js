@@ -470,6 +470,7 @@ app.get('/api/admin/dashboard', async (_req, res) => {
               p.titulo,
               COALESCE(CONCAT(u.nombre, ' ', u.apellido), 'Sin autor') AS autor,
               COALESCE(c.nombre, 'Sin categoría') AS categoria,
+              p.estado_publicacion,
               DATE_FORMAT(p.creado_en, '%Y-%m-%d') AS fecha
          FROM publicaciones p
     LEFT JOIN usuarios u ON p.usuario_id = u.id
@@ -498,6 +499,77 @@ app.get('/api/admin/dashboard', async (_req, res) => {
   return res.status(500).json({ message: 'Error al cargar datos del panel' })
   }
 })
+
+// Actualiza el estado de una publicación desde el panel admin
+app.patch(
+  '/api/admin/publicaciones/:id/estado',
+  [body('estado_publicacion').isIn(['publicada', 'pendiente_revision', 'rechazada'])],
+  async (req, res) => {
+    const errors = validationResult(req)
+
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ message: 'Estado inválido', errors: errors.array() })
+    }
+
+    const { id } = req.params
+    const { estado_publicacion } = req.body
+
+    if (dataSource.mode === 'mock') {
+      const index = mockPublicaciones.findIndex((pub) => String(pub.id) === String(id))
+
+      if (index === -1) {
+        return res.status(404).json({ message: 'Publicación no encontrada' })
+      }
+
+      mockPublicaciones[index].estado_publicacion = estado_publicacion
+
+      return res.json({
+        message: 'Estado de publicación actualizado (mock)',
+        publicacion: mockPublicaciones[index]
+      })
+    }
+
+    try {
+      const [result] = await dataSource.pool.query(
+        `UPDATE publicaciones
+            SET estado_publicacion = ?, actualizado_en = NOW()
+          WHERE id = ?
+          LIMIT 1`,
+        [estado_publicacion, id]
+      )
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'Publicación no encontrada' })
+      }
+
+      const [rows] = await dataSource.pool.query(
+        `SELECT p.id,
+                p.titulo,
+                p.descripcion,
+                p.precio,
+                p.moneda,
+                COALESCE(c.nombre, 'Sin categoría') AS categoria,
+                TRIM(CONCAT(COALESCE(u.nombre, ''), ' ', COALESCE(u.apellido, ''))) AS autor,
+                DATE_FORMAT(p.creado_en, '%Y-%m-%d') AS fecha,
+                p.estado_publicacion,
+                p.visible
+           FROM publicaciones p
+      LEFT JOIN usuarios u ON p.usuario_id = u.id
+      LEFT JOIN categorias c ON p.categoria_id = c.id
+          WHERE p.id = ?
+          LIMIT 1`,
+        [id]
+      )
+
+      const publicacion = rows.length ? formatPublicationRow(rows[0]) : { id: Number(id), estado_publicacion }
+
+      return res.json({ message: 'Estado de publicación actualizado', publicacion })
+    } catch (error) {
+      console.error('Error actualizando estado de publicación:', error.message)
+      return res.status(500).json({ message: 'No fue posible actualizar la publicación' })
+    }
+  }
+)
 
 app.get('/api/admin/usuarios/:id', async (req, res) => {
   const { id } = req.params

@@ -26,16 +26,7 @@ const filtrosPublicaciones = reactive({
   visibilidad: ''
 })
 
-const usuarioEditado = reactive({
-  id: null,
-  nombre: '',
-  email: '',
-  rol: '',
-  telefono: '',
-  ubicacion: '',
-  estado: '',
-  notas: ''
-})
+
 
 const router = useRouter()
 
@@ -44,6 +35,22 @@ const totales = computed(() => ({
   solicitudes: solicitudesPublicacion.value.length,
   publicaciones: publicaciones.value.length
 }))
+
+const solicitudesFiltradas = computed(() => {
+  const termino = filtrosSolicitudes.busqueda.toLowerCase()
+  const estado = filtrosSolicitudes.estado
+
+  return solicitudesPublicacion.value.filter((solicitud) => {
+    const coincideBusqueda =
+      !termino ||
+      solicitud.titulo?.toLowerCase().includes(termino) ||
+      solicitud.autor?.toLowerCase().includes(termino) ||
+      solicitud.categoria?.toLowerCase().includes(termino)
+    const coincideEstado = !estado || solicitud.estado_publicacion === estado
+
+    return coincideBusqueda && coincideEstado
+  })
+})
 
 const registrarAccion = (texto) => {
   mensajeSistema.value = texto
@@ -76,16 +83,83 @@ const sincronizarDashboard = async () => {
   }
 }
 
-const seleccionarUsuario = (usuario) => {
-  usuarioEditado.id = usuario.id || null
-  usuarioEditado.nombre = usuario.nombre || ''
-  usuarioEditado.email = usuario.email || ''
-  usuarioEditado.rol = usuario.rol_id ?? usuario.rol ?? ''
-  usuarioEditado.telefono = usuario.telefono || ''
-  usuarioEditado.ubicacion = usuario.ubicacion || ''
-  usuarioEditado.estado = usuario.estado || ''
-  usuarioEditado.notas = ''
-  registrarAccion('Usuario cargado para edición. Realiza los cambios y guarda.')
+const actualizarEstadoPublicacion = async (solicitud, estado_publicacion) => {
+  if (!solicitud?.id) {
+    registrarAccion('No se pudo identificar la solicitud seleccionada.')
+    return null
+  }
+
+  const response = await fetch(`${apiBase}/admin/publicaciones/${solicitud.id}/estado`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ estado_publicacion })
+  })
+
+  const payload = await response.json().catch(() => ({}))
+
+  if (!response.ok) {
+    throw new Error(payload?.message || 'No fue posible actualizar la publicación')
+  }
+
+  return payload.publicacion || { id: solicitud.id, estado_publicacion }
+}
+
+const solicitudEnRevision = ref(null)
+
+const procesarRevision = async (solicitud, accion) => {
+  if (!solicitud?.id) {
+    registrarAccion('Selecciona una solicitud válida para continuar.')
+    return
+  }
+
+  const estado_publicacion = accion === 'aprobar' ? 'publicada' : 'rechazada'
+  solicitudEnRevision.value = solicitud.id
+
+  try {
+    const publicacionActualizada = await actualizarEstadoPublicacion(solicitud, estado_publicacion)
+
+    solicitudesPublicacion.value = solicitudesPublicacion.value.filter((item) => item.id !== solicitud.id)
+
+    const existente = publicaciones.value.findIndex((item) => item.id === solicitud.id)
+    const registroBase = {
+      id: solicitud.id,
+      titulo: solicitud.titulo,
+      autor: solicitud.autor,
+      categoria: solicitud.categoria,
+      fecha: solicitud.fecha,
+      visibilidad: estado_publicacion
+    }
+
+    if (existente >= 0) {
+      publicaciones.value.splice(existente, 1, {
+        ...publicaciones.value[existente],
+        ...registroBase,
+        ...publicacionActualizada,
+        visibilidad: publicacionActualizada.estado_publicacion || registroBase.visibilidad
+      })
+    } else {
+      publicaciones.value.unshift({
+        ...registroBase,
+        ...publicacionActualizada,
+        visibilidad: publicacionActualizada.estado_publicacion || registroBase.visibilidad
+      })
+    }
+
+    registrarAccion(
+      estado_publicacion === 'publicada'
+        ? 'Publicación aprobada y movida a la lista activa.'
+        : 'Publicación rechazada correctamente.'
+    )
+  } catch (error) {
+    registrarAccion(error.message || 'No se pudo procesar la solicitud. Inténtalo nuevamente.')
+  } finally {
+    solicitudEnRevision.value = null
+  }
+}
+
+const irAlDetallePublicacion = (solicitud) => {
+  if (!solicitud?.id) return
+  router.push({ name: 'admin-publication-detail', params: { id: solicitud.id } })
 }
 
 const irAlDetalleUsuario = (usuario) => {
@@ -97,49 +171,6 @@ const irAlDetalleUsuario = (usuario) => {
   router.push({ name: 'admin-user-detail', params: { id: usuario.id } })
 }
 
-const enviarCambiosUsuario = async () => {
-  if (!usuarioEditado.id) {
-    registrarAccion('Selecciona un usuario de la lista para editarlo.')
-    return
-  }
-
-  const payload = {
-    nombre: usuarioEditado.nombre?.trim() || undefined,
-    email: usuarioEditado.email?.trim() || undefined,
-    estado_registro: usuarioEditado.estado || undefined,
-    rol_id: usuarioEditado.rol ? Number(usuarioEditado.rol) : undefined
-  }
-
-  try {
-    const response = await fetch(`${apiBase}/admin/usuarios/${usuarioEditado.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-
-    const data = await response.json().catch(() => ({}))
-
-    if (!response.ok) {
-      throw new Error(data?.message || 'No se pudieron guardar los cambios')
-    }
-
-    const index = usuarios.value.findIndex((usuario) => usuario.id === usuarioEditado.id)
-    if (index !== -1 && data.usuario) {
-      usuarios.value.splice(index, 1, data.usuario)
-    }
-
-    registrarAccion('Usuario actualizado correctamente en el backend.')
-  } catch (error) {
-    registrarAccion(error.message || 'Error al guardar. Intenta nuevamente.')
-  }
-}
-
-const procesarRevision = (decision) => {
-  const texto = decision === 'aprobar'
-    ? 'Solicitud marcada para aprobación.'
-    : 'Solicitud marcada para rechazo.'
-  registrarAccion(`${texto} Agrega notas para documentar la decisión.`)
-}
 
 onMounted(sincronizarDashboard)
 </script>
@@ -234,7 +265,6 @@ onMounted(sincronizarDashboard)
             </span>
             <div class="list__buttons">
               <button class="btn btn--ghost" type="button" @click="irAlDetalleUsuario(usuario)">Editar</button>
-              <button class="btn btn--ghost" type="button" @click="seleccionarUsuario(usuario)">Edición rápida</button>
               <button class="btn btn--ghost" type="button" @click="registrarAccion('Usuario marcado para bloqueo o eliminación.')">Bloquear/Eliminar</button>
             </div>
           </div>
@@ -244,66 +274,6 @@ onMounted(sincronizarDashboard)
     </section>
 
     <section class="admin__grid">
-      <article class="card admin__editor">
-        <header class="panel__header">
-          <div>
-            <h2>Edición detallada de usuario</h2>
-            <p class="muted">Actualiza datos de contacto, rol y estado sin cargar datos de ejemplo.</p>
-          </div>
-          <span class="badge">Formulario sin envío real</span>
-        </header>
-
-        <form class="form" @submit.prevent="enviarCambiosUsuario">
-          <div class="form__grid">
-            <label class="field">
-              <span>Nombre completo</span>
-              <input v-model="usuarioEditado.nombre" type="text" placeholder="Nombre y apellidos" />
-            </label>
-            <label class="field">
-              <span>Correo</span>
-              <input v-model="usuarioEditado.email" type="email" placeholder="usuario@correo.com" />
-            </label>
-            <label class="field">
-              <span>Teléfono</span>
-              <input v-model="usuarioEditado.telefono" type="tel" placeholder="+56 9 0000 0000" />
-            </label>
-            <label class="field">
-              <span>Ubicación</span>
-              <input v-model="usuarioEditado.ubicacion" type="text" placeholder="Ciudad o región" />
-            </label>
-            <label class="field">
-              <span>Rol</span>
-              <select v-model="usuarioEditado.rol">
-                <option value="">Selecciona un rol</option>
-                <option value="1">Superadministrador</option>
-                <option value="2">Administrador</option>
-                <option value="3">Vendedor</option>
-              </select>
-            </label>
-            <label class="field">
-              <span>Estado</span>
-              <select v-model="usuarioEditado.estado">
-                <option value="">Selecciona estado</option>
-                <option value="aprobado">Aprobado</option>
-                <option value="pendiente">Pendiente</option>
-                <option value="rechazado">Rechazado</option>
-                <option value="bloqueado">Bloqueado</option>
-              </select>
-            </label>
-          </div>
-
-          <label class="field">
-            <span>Notas administrativas</span>
-            <textarea v-model="usuarioEditado.notas" rows="3" placeholder="Agrega comentarios o decisiones tomadas"></textarea>
-          </label>
-
-          <div class="form__actions">
-            <button class="btn btn--ghost" type="button" @click="registrarAccion('Cambios descartados localmente.')">Descartar</button>
-            <button class="btn btn--primary" type="submit">Guardar cambios</button>
-          </div>
-        </form>
-      </article>
-
       <article class="card admin__requests">
         <header class="panel__header">
           <div>
@@ -328,14 +298,35 @@ onMounted(sincronizarDashboard)
         </header>
 
         <div v-if="solicitudesPublicacion.length" class="requests">
-          <article v-for="solicitud in solicitudesPublicacion" :key="solicitud.id" class="request">
+          <article v-for="solicitud in solicitudesFiltradas" :key="solicitud.id" class="request">
             <div>
               <p class="request__title">{{ solicitud.titulo }}</p>
               <p class="muted">{{ solicitud.autor }} · {{ solicitud.categoria }}</p>
             </div>
             <div class="request__actions">
-              <button class="btn btn--ghost" type="button" @click="procesarRevision('rechazar')">Rechazar</button>
-              <button class="btn btn--primary" type="button" @click="procesarRevision('aprobar')">Aprobar</button>
+              <button
+                class="btn btn--ghost"
+                type="button"
+                :disabled="solicitudEnRevision === solicitud.id"
+                @click="procesarRevision(solicitud, 'rechazar')"
+              >
+                {{ solicitudEnRevision === solicitud.id ? 'Procesando...' : 'Rechazar' }}
+              </button>
+              <button
+                class="btn btn--ghost"
+                type="button"
+                @click="irAlDetallePublicacion(solicitud)"
+              >
+                Ver detalles
+              </button>
+              <button
+                class="btn btn--primary"
+                type="button"
+                :disabled="solicitudEnRevision === solicitud.id"
+                @click="procesarRevision(solicitud, 'aprobar')"
+              >
+                {{ solicitudEnRevision === solicitud.id ? 'Procesando...' : 'Aprobar' }}
+              </button>
             </div>
           </article>
         </div>
