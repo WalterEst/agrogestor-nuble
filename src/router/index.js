@@ -120,6 +120,18 @@ const routes = [
         name: 'publisher-profile',
         component: () => import('../views/dashboard/publisher/EditProfileView.vue'),
         meta: { title: 'Mi Perfil' }
+      },
+      {
+        path: 'contacto',
+        name: 'publisher-contact',
+        component: () => import('../views/dashboard/publisher/ContactView.vue'),
+        meta: { title: 'Contacto y Soporte' }
+      },
+      {
+        path: 'reportes',
+        name: 'publisher-reports',
+        component: () => import('../views/dashboard/publisher/MyReportsView.vue'),
+        meta: { title: 'Mis Reportes' }
       }
     ]
   }

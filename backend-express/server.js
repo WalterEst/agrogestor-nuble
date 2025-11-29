@@ -1082,6 +1082,62 @@ app.put('/api/publisher/profile', async (req, res) => {
 });
 
 
+// RUTAS DE SOPORTE Y REPORTES
+let mockReportes = [
+    { id: 1, asunto: 'Problema con subida de imágenes', mensaje: 'No me deja subir fotos PNG', estado: 'resuelto', fecha: '2024-11-20', respuesta: 'Actualiza tu navegador.' },
+    { id: 2, asunto: 'Denuncia de usuario', mensaje: 'El usuario X vende productos falsos', estado: 'pendiente', fecha: '2024-11-28', respuesta: null }
+];
+
+// 8. GET: Mis Reportes/Tickets
+app.get('/api/publisher/reports', async (req, res) => {
+    const userId = 1; // Hardcodeado
+    if (dataSource.mode === 'mock') return res.json(mockReportes);
+
+    try {
+        // SQL REAL (Asegúrate de crear esta tabla luego)
+        /* CREATE TABLE soporte_tickets (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            usuario_id INT,
+            asunto VARCHAR(255),
+            mensaje TEXT,
+            estado VARCHAR(50) DEFAULT 'pendiente',
+            respuesta TEXT,
+            creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        */
+        const [rows] = await dataSource.pool.query(
+            `SELECT id, asunto, mensaje, estado, respuesta, DATE_FORMAT(creado_en, '%Y-%m-%d') as fecha 
+             FROM soporte_tickets WHERE usuario_id = ? ORDER BY creado_en DESC`, 
+            [userId]
+        );
+        return res.json(rows);
+    } catch (e) {
+        // Fallback a mock si no existe la tabla aún
+        return res.json(mockReportes); 
+    }
+});
+
+// 9. POST: Crear Nuevo Reporte/Contacto
+app.post('/api/publisher/contact', async (req, res) => {
+    const { asunto, mensaje } = req.body;
+    
+    if (dataSource.mode === 'mock') {
+        const nuevo = { id: Date.now(), asunto, mensaje, estado: 'pendiente', fecha: new Date().toISOString().split('T')[0], respuesta: null };
+        mockReportes.unshift(nuevo);
+        return res.status(201).json({ message: 'Mensaje enviado' });
+    }
+
+    try {
+        await dataSource.pool.query(
+            `INSERT INTO soporte_tickets (usuario_id, asunto, mensaje, estado, creado_en) VALUES (?, ?, ?, 'pendiente', NOW())`,
+            [1, asunto, mensaje]
+        );
+        return res.status(201).json({ message: 'Mensaje enviado correctamente' });
+    } catch (e) {
+        console.error(e);
+        return res.status(500).json({ message: 'Error al enviar mensaje' });
+    }
+});
 
 // Inicializa el pool y levanta la API
 bootstrapPool().finally(() => {

@@ -24,7 +24,7 @@ export default {
     return api.delete(`/publisher/products/${id}`);
   },
 
-getProfile() {
+  getProfile() {
    
     const userStr = localStorage.getItem('user');
     let userId = 1; 
@@ -42,7 +42,7 @@ getProfile() {
     return api.get(`/publisher/profile?userId=${userId}`);
   },
 
-updateProfile(data) {
+  updateProfile(data) {
     
     const userStr = localStorage.getItem('user');
     let userId = 1; 
@@ -59,5 +59,14 @@ updateProfile(data) {
     
     
     return api.put(`/publisher/profile?userId=${userId}`, data);
+  },
+  // --- SOPORTE ---
+  getMyReports() {
+    return api.get('/publisher/reports');
+  },
+
+  sendContactForm(data) {
+    return api.post('/publisher/contact', data);
   }
+
 };

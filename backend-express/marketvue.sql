@@ -92,3 +92,14 @@ CREATE INDEX idx_admin_acciones_obj ON admin_acciones (objetivo_tipo, objetivo_i
 
 -- 1. Agregar la columna stock si no existe (Causa principal del error 500)
 ALTER TABLE publicaciones ADD COLUMN stock INT DEFAULT 0;
+
+-- 2. Crear la tabla reportes si no existe 
+CREATE TABLE IF NOT EXISTS soporte_tickets (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    usuario_id INT NOT NULL,
+    asunto VARCHAR(255) NOT NULL,
+    mensaje TEXT NOT NULL,
+    estado VARCHAR(50) DEFAULT 'pendiente',
+    respuesta TEXT,
+    creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
+);
