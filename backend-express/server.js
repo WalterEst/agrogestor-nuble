@@ -890,7 +890,7 @@ app.get('/api/publisher/products', async (req, res) => {
     }
 });
 
-// 2. GET: Detalle de mi producto (CORREGIDO Y BLINDADO)
+// 2. GET: Detalle de mi producto 
 app.get('/api/publisher/products/:id', async (req, res) => {
     const { id } = req.params;
     
@@ -919,13 +919,13 @@ app.get('/api/publisher/products/:id', async (req, res) => {
         );
 
         if(rows.length > 0) {
-            // Formateamos para que el frontend reciba "name", "price", etc.
+            
             return res.json(formatPublicationRow(rows[0]));
         }
         
         return res.status(404).json({message: 'Producto no encontrado'});
     } catch (e) {
-        console.error("ERROR EN DETALLE:", e.message); // Esto nos dirá el error exacto en la terminal negra
+        console.error("ERROR EN DETALLE:", e.message); 
         return res.status(500).json({message: 'Error servidor al cargar detalle'});
     }
 });
@@ -1011,6 +1011,77 @@ app.delete('/api/publisher/products/:id', async (req, res) => {
         return res.status(500).json({ message: 'Error eliminando' });
     }
 });
+
+
+// 6. GET: Obtener mi perfil
+app.get('/api/publisher/profile', async (req, res) => {
+
+    const userId = req.query.userId || 1;
+
+    console.log(`🔍 Buscando perfil en BD para ID: ${userId}`);
+
+    if (dataSource.mode === 'mock') {
+        return res.json(mockUsers[0]);
+    }
+
+    try {
+        const [rows] = await dataSource.pool.query(
+            `SELECT id, nombre, apellido, email, estado_registro 
+             FROM usuarios 
+             WHERE id = ?`, 
+            [userId]
+        );
+
+        if (rows.length > 0) {
+            console.log("✅ Usuario encontrado:", rows[0].nombre);
+            return res.json(rows[0]);
+        }
+        
+        console.warn("⚠️ Usuario no encontrado en la tabla 'usuarios'");
+        return res.status(404).json({ message: 'Usuario no encontrado en BD' });
+
+    } catch (e) { 
+        console.error("❌ ERROR CRÍTICO EN PERFIL:", e); 
+        return res.status(500).json({message: 'Error al leer perfil en base de datos'}); 
+    }
+});
+
+// 7. PUT: Actualizar perfil
+app.put('/api/publisher/profile', async (req, res) => {
+    
+    const userId = req.query.userId || 1;
+    const { nombre, apellido, email, password, currentPassword } = req.body;
+
+    if (dataSource.mode === 'mock') {
+     
+        return res.json({ message: 'Perfil actualizado (Mock)' });
+    }
+
+    try {
+        
+        let query = 'UPDATE usuarios SET nombre=?, apellido=?, email=?';
+        let params = [nombre, apellido, email];
+
+    
+        if (password && password.length > 0) {
+            query += ', passwrd=?'; 
+            params.push(password);
+        }
+
+        query += ' WHERE id=?';
+        params.push(currentUserId);
+
+        await dataSource.pool.query(query, params);
+
+        return res.json({ message: 'Perfil actualizado correctamente' });
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: 'Error al actualizar perfil' });
+    }
+});
+
+
 
 // Inicializa el pool y levanta la API
 bootstrapPool().finally(() => {

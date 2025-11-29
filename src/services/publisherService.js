@@ -22,5 +22,42 @@ export default {
 
   deleteProduct(id) {
     return api.delete(`/publisher/products/${id}`);
+  },
+
+getProfile() {
+   
+    const userStr = localStorage.getItem('user');
+    let userId = 1; 
+
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user.id) userId = user.id;
+      } catch (e) {
+        console.warn("Error leyendo storage");
+      }
+    }
+    
+    
+    return api.get(`/publisher/profile?userId=${userId}`);
+  },
+
+updateProfile(data) {
+    
+    const userStr = localStorage.getItem('user');
+    let userId = 1; 
+
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        
+        if (user.id) userId = user.id;
+      } catch (e) {
+        console.warn("Error leyendo usuario del storage al actualizar");
+      }
+    }
+    
+    
+    return api.put(`/publisher/profile?userId=${userId}`, data);
   }
 };

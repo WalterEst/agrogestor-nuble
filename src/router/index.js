@@ -88,9 +88,9 @@ const routes = [
     meta: { authRequired: true, allowedRoles: ['publisher', 'publicador', 'vendedor', 3] },
     children: [
       {
-        path: 'mis-productos', // URL: /panel/publicador/mis-productos
-        alias: 'mis-publicaciones', // mantenemos compatibilidad con la ruta anterior
-        name: 'publisher-products', // Mantenemos el name interno por si acaso
+        path: 'mis-productos', 
+        alias: 'mis-publicaciones', 
+        name: 'publisher-products', 
         component: MyProductsView,
         meta: { title: 'Mis Publicaciones' }
       },
@@ -114,6 +114,12 @@ const routes = [
         component: ProductDetailView,
         props: true,
         meta: { title: 'Detalle de Publicación' }
+      },
+      {
+        path: 'perfil',
+        name: 'publisher-profile',
+        component: () => import('../views/dashboard/publisher/EditProfileView.vue'),
+        meta: { title: 'Mi Perfil' }
       }
     ]
   }

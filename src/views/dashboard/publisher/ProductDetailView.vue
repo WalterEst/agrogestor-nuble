@@ -114,10 +114,10 @@ const handleDelete = async () => {
 
         <div class="info-actions">
           <button @click="goToEdit" class="pub-btn">
-            ✏️ Editar Información
+            Editar Información
           </button>
           <button @click="handleDelete" class="pub-btn pub-btn--danger" style="background: white; border: 1px solid #fee2e2;">
-            🗑️ Eliminar
+            Eliminar
           </button>
         </div>
 
@@ -132,7 +132,7 @@ const handleDelete = async () => {
 </template>
 
 <style scoped>
-/* Copiamos los estilos previos para mantener el diseño */
+
 .detail-grid { display: grid; grid-template-columns: 1fr; gap: 2rem; }
 @media (min-width: 768px) { .detail-grid { grid-template-columns: 350px 1fr; } }
 

@@ -13,18 +13,16 @@ onMounted(() => {
   store.fetchMyProducts();
 });
 
-// Helper para obtener el nombre del estado
 const getStatusLabel = (status) => {
   if (!status) return '';
   const map = { 
-    approved: 'Publicado', publicdad: 'Publicado',
+    approved: 'Publicado', 
     pending: 'En Revisión', pendiente_revision: 'En Revisión',
     rejected: 'Rechazado' 
   };
   return map[status] || status;
 };
 
-// Helper para el color del estado
 const getStatusClass = (status) => {
   const map = { 
     approved: 'bg-green-100 text-green-800', 
@@ -56,7 +54,7 @@ const handleDelete = async (id) => {
         <p>Administra tus productos de MarketVue</p>
       </div>
       <button class="pub-btn" @click="createNew">
-        + Nuevo Producto
+        Nuevo Producto
       </button>
     </div>
 
@@ -74,7 +72,7 @@ const handleDelete = async (id) => {
         
         <div class="card-thumb">
             <img v-if="product.portada" :src="product.portada" :alt="product.name" class="product-img">
-            <div v-else class="no-image-placeholder">📦</div>
+            <div v-else class="no-image-text">Sin Img</div>
         </div>
 
         <div class="card-info">
@@ -96,9 +94,9 @@ const handleDelete = async (id) => {
           </span>
           
           <div class="buttons-row">
-            <button @click="goToDetail(product.id)" class="action-btn view-btn" title="Ver">👁️</button>
-            <button @click="goToEdit(product.id)" class="action-btn edit-btn" title="Editar">✏️</button>
-            <button @click="handleDelete(product.id)" class="action-btn delete-btn" title="Eliminar">🗑️</button>
+            <button @click="goToDetail(product.id)" class="text-btn view-btn">Ver</button>
+            <button @click="goToEdit(product.id)" class="text-btn edit-btn">Editar</button>
+            <button @click="handleDelete(product.id)" class="text-btn delete-btn">Eliminar</button>
           </div>
         </div>
 
@@ -108,42 +106,30 @@ const handleDelete = async (id) => {
 </template>
 
 <style scoped>
-/* Contenedor principal */
 .publisher-container {
   max-width: 1000px;
   margin: 0 auto;
   padding: 1rem;
 }
 
-/* Estilo de Tarjeta Flotante */
 .float-card {
   background: white;
-  border-radius: 12px; /* Bordes redondeados */
+  border-radius: 8px;
   padding: 1.2rem;
   margin-bottom: 1rem;
-  
-  /* EL EFECTO FLOTANTE (Sombra) */
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  border: 1px solid rgba(0,0,0,0.05);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  border: 1px solid #e5e7eb;
   
   display: grid;
-  grid-template-columns: 80px 1fr auto; /* Imagen - Info - Acciones */
+  grid-template-columns: 80px 1fr auto;
   gap: 1.5rem;
   align-items: center;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Animación al pasar el mouse */
-.float-card:hover {
-  transform: translateY(-3px); /* Se levanta un poco */
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-}
-
-/* Imagen */
 .card-thumb {
   width: 80px;
   height: 80px;
-  border-radius: 10px;
+  border-radius: 6px;
   overflow: hidden;
   background-color: #f3f4f6;
   display: flex;
@@ -152,71 +138,33 @@ const handleDelete = async (id) => {
   border: 1px solid #e5e7eb;
 }
 .product-img { width: 100%; height: 100%; object-fit: cover; }
-.no-image-placeholder { font-size: 2rem; }
+.no-image-text { font-size: 0.7rem; color: #9ca3af; font-weight: 600; text-align: center; }
 
-/* Texto e Info */
-.card-info h3 {
-  margin: 0 0 0.5rem 0;
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: #1f2937;
-}
-.card-meta {
-  display: flex;
-  gap: 1rem;
-  font-size: 0.9rem;
-  color: #6b7280;
-}
-.price-tag {
-  color: #059669; /* Verde dinero */
-  font-weight: 700;
-  font-size: 1rem;
-}
+.card-info h3 { margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 700; color: #1f2937; }
+.card-meta { display: flex; gap: 1rem; font-size: 0.9rem; color: #6b7280; }
+.price-tag { color: #059669; font-weight: 700; }
 
-/* Acciones */
-.card-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.8rem;
-}
+.card-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 0.8rem; }
 
-.status-badge {
-  padding: 0.25rem 0.75rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-}
+.status-badge { padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
 
-.buttons-row {
-  display: flex;
-  gap: 0.5rem;
-}
+.buttons-row { display: flex; gap: 0.5rem; }
 
-.action-btn {
-  width: 35px;
-  height: 35px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+
+.text-btn {
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  border: 1px solid #e5e7eb;
+  background: white;
   cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
   transition: all 0.2s;
-  background: #f9fafb;
+  color: #374151;
 }
-.view-btn:hover { background: #dbeafe; color: #1e40af; }
-.edit-btn:hover { background: #fef3c7; color: #92400e; }
-.delete-btn:hover { background: #fee2e2; color: #991b1b; }
+.view-btn:hover { border-color: #3b82f6; color: #3b82f6; background: #eff6ff; }
+.edit-btn:hover { border-color: #f59e0b; color: #d97706; background: #fffbeb; }
+.delete-btn:hover { border-color: #ef4444; color: #dc2626; background: #fef2f2; }
 
-/* Estados vacíos */
-.loading-state, .empty-state {
-  text-align: center;
-  padding: 3rem;
-  color: #9ca3af;
-  background: #f9fafb;
-  border-radius: 12px;
-  border: 2px dashed #e5e7eb;
-}
+.loading-state, .empty-state { text-align: center; padding: 3rem; color: #9ca3af; background: #f9fafb; border-radius: 8px; border: 1px dashed #e5e7eb; }
 </style>
