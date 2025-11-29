@@ -88,3 +88,7 @@ CREATE TABLE admin_acciones (
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_admin_acciones_obj ON admin_acciones (objetivo_tipo, objetivo_id);
+
+
+-- 1. Agregar la columna stock si no existe (Causa principal del error 500)
+ALTER TABLE publicaciones ADD COLUMN stock INT DEFAULT 0;

@@ -4,6 +4,10 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import { body, validationResult } from 'express-validator'
 import mysql from 'mysql2/promise'
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 
 // Carga variables de entorno
 dotenv.config()
@@ -15,6 +19,29 @@ const PORT = process.env.PORT || 3000
 // Activa CORS y JSON
 app.use(cors())
 app.use(express.json())
+
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Configurar carpeta pública para que el navegador vea las fotos
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(__dirname, 'uploads');
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath);
+    }
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = Date.now() + '-' + file.originalname.replace(/\s+/g, '-');
+    cb(null, uniqueName);
+  }
+});
+
+const upload = multer({ storage: storage });
 
 // Configuración de la base de datos
 const dbConfig = {
@@ -113,15 +140,21 @@ const formatUser = (user) => ({
 const formatPublicationRow = (row) => ({
   id: row.id,
   titulo: row.titulo,
+  name: row.titulo, 
   descripcion: row.descripcion,
   precio: row.precio,
+  price: row.precio, 
   moneda: row.moneda,
   categoria: row.categoria,
   autor: row.autor,
   fecha: row.fecha,
+  status: row.estado_publicacion === 'publicada' ? 'approved' : 'pending',
   estado_publicacion: row.estado_publicacion,
-  portada: row.portada
-})
+  portada: row.portada,
+  
+
+  stock: row.stock || 0 
+});
 
 
 // Inicia la conexión al pool MySQL
@@ -825,6 +858,159 @@ app.post(
     }
   }
 )
+
+// 1. GET: Mis Publicaciones 
+app.get('/api/publisher/products', async (req, res) => {
+    const currentUserId = 1; 
+    
+    if (dataSource.mode === 'mock') {
+        return res.json(mockPublicaciones.map(formatPublicationRow));
+    }
+
+    try {
+
+        const [rows] = await dataSource.pool.query(
+            `SELECT 
+                p.id, 
+                p.titulo, 
+                p.descripcion, 
+                p.precio, 
+                p.estado_publicacion, 
+                p.stock,  
+                (SELECT ruta_imagen FROM publicaciones_imagenes WHERE publicacion_id = p.id ORDER BY es_portada DESC LIMIT 1) as portada
+             FROM publicaciones p 
+             WHERE usuario_id = ? 
+             ORDER BY p.creado_en DESC`, 
+            [currentUserId]
+        );
+        return res.json(rows.map(formatPublicationRow));
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: 'Error cargando mis productos' });
+    }
+});
+
+// 2. GET: Detalle de mi producto (CORREGIDO Y BLINDADO)
+app.get('/api/publisher/products/:id', async (req, res) => {
+    const { id } = req.params;
+    
+    // Si estamos en modo Mock
+    if (dataSource.mode === 'mock') {
+        const prod = mockPublicaciones.find(p => p.id == id);
+        return prod ? res.json(formatPublicationRow(prod)) : res.status(404).json({message: 'No encontrado'});
+    }
+    
+    // Lógica DB Real
+    try {
+        const [rows] = await dataSource.pool.query(
+            `SELECT 
+                p.id, 
+                p.titulo, 
+                p.descripcion, 
+                p.precio, 
+                p.moneda, 
+                p.estado_publicacion, 
+                p.stock,  
+                p.creado_en as fecha,
+                (SELECT ruta_imagen FROM publicaciones_imagenes WHERE publicacion_id = p.id ORDER BY es_portada DESC LIMIT 1) as portada
+             FROM publicaciones p 
+             WHERE p.id = ?`, 
+            [id]
+        );
+
+        if(rows.length > 0) {
+            // Formateamos para que el frontend reciba "name", "price", etc.
+            return res.json(formatPublicationRow(rows[0]));
+        }
+        
+        return res.status(404).json({message: 'Producto no encontrado'});
+    } catch (e) {
+        console.error("ERROR EN DETALLE:", e.message); // Esto nos dirá el error exacto en la terminal negra
+        return res.status(500).json({message: 'Error servidor al cargar detalle'});
+    }
+});
+
+// 3. POST: Crear Producto
+app.post('/api/publisher/products', upload.single('portada'), async (req, res) => {
+    
+  
+    console.log("-----------------------------------------");
+    console.log("INTENTO DE CREAR PRODUCTO");
+    console.log("Body (Texto):", req.body);
+    console.log("File (Imagen):", req.file);
+    console.log("-----------------------------------------");
+
+    const { name, price, stock, description } = req.body;
+    const file = req.file;
+    const portadaUrl = file ? `http://localhost:${PORT}/uploads/${file.filename}` : null;
+
+    // Validación Backend
+    if (!name || !price) {
+        console.log("ERROR: Nombre o precio faltantes");
+        return res.status(400).json({ message: 'Faltan datos obligatorios' });
+    }
+
+try {
+        const [result] = await dataSource.pool.query(
+            `INSERT INTO publicaciones 
+            (titulo, precio, stock, descripcion, usuario_id, estado_publicacion, visible, creado_en)
+            VALUES (?, ?, ?, ?, ?, 'pendiente_revision', 1, NOW())`, 
+            [name, price, stock, description, 1]
+        );
+        
+        const newProductId = result.insertId;
+
+        if (portadaUrl) {
+            await dataSource.pool.query(
+                `INSERT INTO publicaciones_imagenes (publicacion_id, ruta_imagen, es_portada, orden)
+                 VALUES (?, ?, 1, 1)`,
+                [newProductId, portadaUrl]
+            );
+        }
+
+        return res.status(201).json({ message: 'Creado', id: newProductId });
+
+    } catch (error) {
+        console.error("ERROR SQL DETALLADO:", error); 
+        return res.status(500).json({ message: 'Error en base de datos', error: error.message });
+    }
+});
+
+// 4. PUT: Editar
+app.put('/api/publisher/products/:id', async (req, res) => {
+    const { id } = req.params;
+    const { name, price, description } = req.body;
+
+    if (dataSource.mode === 'mock') {
+      
+       return res.json({ message: 'Editado (Mock)' });
+    }
+    
+    try {
+        await dataSource.pool.query(
+            'UPDATE publicaciones SET titulo=?, precio=?, descripcion=? WHERE id=?',
+            [name, price, description, id]
+        );
+        return res.json({ message: 'Actualizado correctamente' });
+    } catch (e) {
+        return res.status(500).json({ message: 'Error al actualizar' });
+    }
+});
+
+// 5. DELETE: Eliminar
+app.delete('/api/publisher/products/:id', async (req, res) => {
+    const { id } = req.params;
+    if (dataSource.mode === 'mock') {
+        mockPublicaciones = mockPublicaciones.filter(p => p.id != id);
+        return res.json({ message: 'Eliminado (Mock)' });
+    }
+    try {
+        await dataSource.pool.query('DELETE FROM publicaciones WHERE id = ?', [id]);
+        return res.json({ message: 'Producto eliminado de BD' });
+    } catch (error) {
+        return res.status(500).json({ message: 'Error eliminando' });
+    }
+});
 
 // Inicializa el pool y levanta la API
 bootstrapPool().finally(() => {
