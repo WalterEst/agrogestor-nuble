@@ -75,7 +75,7 @@ const handleDelete = async () => {
       
       <div class="detail-image-container">
         <img v-if="product.portada" :src="product.portada" :alt="product.name">
-        <div v-else class="no-image">📦 Sin Imagen</div>
+        <div v-else class="no-image">Sin imagen</div>
 
         <div class="status-overlay">
           <span :class="['pub-badge', getStatusClass(product.status || product.estado_publicacion)]">

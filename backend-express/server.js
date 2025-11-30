@@ -536,7 +536,7 @@ app.get('/api/admin/dashboard', async (_req, res) => {
 // Actualiza el estado de una publicación desde el panel admin
 app.patch(
   '/api/admin/publicaciones/:id/estado',
-  [body('estado_publicacion').isIn(['publicada', 'pendiente_revision', 'rechazada'])],
+  [body('estado_publicacion').isIn(['publicada', 'pendiente_revision', 'rechazada', 'oculta'])],
   async (req, res) => {
     const errors = validationResult(req)
 
@@ -1018,7 +1018,7 @@ app.get('/api/publisher/profile', async (req, res) => {
 
     const userId = req.query.userId || 1;
 
-    console.log(`🔍 Buscando perfil en BD para ID: ${userId}`);
+    console.log(`Buscando perfil en BD para ID: ${userId}`);
 
     if (dataSource.mode === 'mock') {
         return res.json(mockUsers[0]);
@@ -1033,15 +1033,15 @@ app.get('/api/publisher/profile', async (req, res) => {
         );
 
         if (rows.length > 0) {
-            console.log("✅ Usuario encontrado:", rows[0].nombre);
+            console.log("Usuario encontrado:", rows[0].nombre);
             return res.json(rows[0]);
         }
-        
-        console.warn("⚠️ Usuario no encontrado en la tabla 'usuarios'");
+
+        console.warn("Usuario no encontrado en la tabla 'usuarios'");
         return res.status(404).json({ message: 'Usuario no encontrado en BD' });
 
     } catch (e) { 
-        console.error("❌ ERROR CRÍTICO EN PERFIL:", e); 
+        console.error("ERROR CRÍTICO EN PERFIL:", e); 
         return res.status(500).json({message: 'Error al leer perfil en base de datos'}); 
     }
 });
@@ -1094,17 +1094,6 @@ app.get('/api/publisher/reports', async (req, res) => {
     if (dataSource.mode === 'mock') return res.json(mockReportes);
 
     try {
-        // SQL REAL (Asegúrate de crear esta tabla luego)
-        /* CREATE TABLE soporte_tickets (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            usuario_id INT,
-            asunto VARCHAR(255),
-            mensaje TEXT,
-            estado VARCHAR(50) DEFAULT 'pendiente',
-            respuesta TEXT,
-            creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
-        );
-        */
         const [rows] = await dataSource.pool.query(
             `SELECT id, asunto, mensaje, estado, respuesta, DATE_FORMAT(creado_en, '%Y-%m-%d') as fecha 
              FROM soporte_tickets WHERE usuario_id = ? ORDER BY creado_en DESC`, 
@@ -1112,7 +1101,6 @@ app.get('/api/publisher/reports', async (req, res) => {
         );
         return res.json(rows);
     } catch (e) {
-        // Fallback a mock si no existe la tabla aún
         return res.json(mockReportes); 
     }
 });

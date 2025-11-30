@@ -33,7 +33,6 @@ const obtenerProducto = async () => {
     const response = await fetch(`http://localhost:3000/api/publicaciones/${productId.value}`)
     
     if (!response.ok) {
-      // Si no existe el detalle en el endpoint, intentamos un fallback
       if (response.status === 404) {
         console.warn(`Detalle no encontrado en /api/publicaciones/${productId.value}, intentando buscar en la lista...`)
         const found = await buscarEnLista(productId.value)
@@ -56,7 +55,6 @@ const obtenerProducto = async () => {
   }
 }
 
-// Fallback: obtiene la lista completa y busca el producto por id
 const buscarEnLista = async (id) => {
   try {
     const resp = await fetch('http://localhost:3000/api/publicaciones')
@@ -69,7 +67,6 @@ const buscarEnLista = async (id) => {
     const match = lista.find(p => String(p.id) === String(id))
     if (!match) return null
 
-    // Si viene desde la lista, probablemente no tenga datos de vendedor; añadimos un vendedor mínimo
     return {
       ...match,
       vendedor: match.vendedor || {
@@ -96,19 +93,16 @@ onMounted(() => {
 
 <template>
   <div class="detalle-producto">
-    <!-- Botón para volver -->
     <div class="botones-header">
       <button @click="volverAlCatalogo" class="btn-volver">
         ← Volver al catálogo
       </button>
     </div>
 
-    <!-- Estado de carga -->
     <div v-if="cargando" class="estado-carga">
       <p>Cargando detalles del producto...</p>
     </div>
 
-    <!-- Mensaje de error -->
     <div v-if="error && !cargando" class="error-mensaje">
       <p>{{ error }}</p>
       <RouterLink to="/publicaciones" class="btn-volver">
@@ -116,10 +110,8 @@ onMounted(() => {
       </RouterLink>
     </div>
 
-    <!-- Contenido del producto -->
     <div v-if="producto && !cargando && !error" class="producto-detalle-container">
       <div class="producto-main">
-        <!-- Imagen principal -->
         <div class="imagen-section">
           <div class="imagen-principal">
             <img
@@ -134,7 +126,6 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- Información del producto -->
         <div class="info-section">
           <h1 class="titulo">{{ producto.titulo }}</h1>
 
@@ -162,7 +153,6 @@ onMounted(() => {
             </button>
           </div>
 
-          <!-- Estado del producto -->
           <div class="estado-publicacion">
             <span class="badge" :class="producto.estado_publicacion">
               {{ producto.estado_publicacion }}
@@ -171,7 +161,6 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Tarjeta del vendedor -->
       <div class="vendedor-section">
         <div class="vendedor-card">
           <h2>Información del vendedor</h2>
@@ -189,11 +178,11 @@ onMounted(() => {
               </h3>
 
               <p v-if="producto.vendedor?.email" class="email">
-                📧 {{ producto.vendedor.email }}
+                Correo: {{ producto.vendedor.email }}
               </p>
 
               <p v-if="producto.vendedor?.ciudad" class="ubicacion">
-                📍 {{ producto.vendedor.ciudad }}
+                Ciudad: {{ producto.vendedor.ciudad }}
               </p>
 
               <p v-if="producto.vendedor?.estado_registro" class="estado">
