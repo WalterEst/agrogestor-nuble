@@ -796,7 +796,7 @@ app.put(
         .status(403)
         .json({ message: 'Solo el super administrador puede editar datos o roles de usuarios' })
     }
-    
+
     const update = buildUpdateQuery({
       nombre: actorRoleId === ROLE_IDS.SUPER_ADMIN ? nombre : undefined,
       apellido: actorRoleId === ROLE_IDS.SUPER_ADMIN ? apellido : undefined,
@@ -851,6 +851,81 @@ app.put(
     }
   }
 )
+
+// Endpoint para eliminar usuarios y sus publicaciones (solo super admin)
+app.delete('/api/admin/usuarios/:id', async (req, res) => {
+  const { id } = req.params
+  const actorRoleId = getActorRoleId(req)
+
+  if (actorRoleId !== ROLE_IDS.SUPER_ADMIN) {
+    return res.status(403).json({ message: 'Solo el super administrador puede eliminar usuarios' })
+  }
+
+  if (dataSource.mode === 'mock') {
+    const index = mockUsers.findIndex((user) => String(user.id) === String(id))
+
+    if (index === -1) {
+      return res.status(404).json({ message: 'Usuario no encontrado' })
+    }
+
+    const usuario = mockUsers[index]
+    const nombreCompleto = `${usuario.nombre} ${usuario.apellido}`.trim()
+
+    mockUsers.splice(index, 1)
+
+    let publicacionesEliminadas = 0
+    for (let i = mockPublicaciones.length - 1; i >= 0; i -= 1) {
+      const pub = mockPublicaciones[i]
+      if (pub.usuario_id === usuario.id || pub.autor === nombreCompleto || pub.autor === usuario.nombre) {
+        mockPublicaciones.splice(i, 1)
+        publicacionesEliminadas += 1
+      }
+    }
+
+    return res.json({
+      message: 'Usuario y publicaciones eliminados (mock)',
+      usuarioId: usuario.id,
+      publicacionesEliminadas
+    })
+  }
+
+  let connection
+
+  try {
+    connection = await dataSource.pool.getConnection()
+    await connection.beginTransaction()
+
+    const [publicaciones] = await connection.query(
+      'DELETE FROM publicaciones WHERE usuario_id = ?',
+      [id]
+    )
+
+    const [result] = await connection.query('DELETE FROM usuarios WHERE id = ? LIMIT 1', [id])
+
+    if (result.affectedRows === 0) {
+      await connection.rollback()
+      return res.status(404).json({ message: 'Usuario no encontrado' })
+    }
+
+    await connection.commit()
+
+    return res.json({
+      message: 'Usuario y sus publicaciones eliminados correctamente',
+      usuarioId: Number(id),
+      publicacionesEliminadas: publicaciones.affectedRows
+    })
+  } catch (error) {
+    if (connection) {
+      await connection.rollback()
+    }
+    console.error('Error eliminando usuario:', error.message)
+    return res.status(500).json({ message: 'No fue posible eliminar el usuario' })
+  } finally {
+    if (connection) {
+      connection.release()
+    }
+  }
+})
 
 // Endpoint para registrar nuevos usuarios
 app.post(
