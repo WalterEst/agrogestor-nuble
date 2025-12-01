@@ -65,4 +65,19 @@ const enviarMensaje = async () => {
 
 <style scoped>
 @import '../../../estilos/PublisherDashboard.css';
+
+/* Contact card improvements */
+.pub-card { box-shadow: 0 8px 24px rgba(6,78,59,0.06); border-radius: 12px; }
+.pub-field label { font-weight: 700; color: #064e3b; }
+.pub-input, .pub-textarea { width:100%; padding: 0.8rem; border-radius: 8px; border: 1px solid #dbe7e0; font-size: 0.95rem; }
+.pub-textarea { min-height: 140px; resize: vertical; }
+.pub-btn { background: linear-gradient(180deg,#0b5e45,#04623b); color:#fff; padding:0.7rem 1.2rem; border-radius:8px; }
+.pub-btn:disabled { opacity:0.7 }
+.pub-card { max-width:720px; margin: 0 auto; }
+
+/* Responsive tweaks */
+@media (max-width:640px) {
+  .pub-card { padding: 1rem }
+  .pub-textarea { min-height:120px }
+}
 </style>

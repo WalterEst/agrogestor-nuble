@@ -113,7 +113,6 @@ const handleSubmit = async () => {
             contacta al administrador de la plataforma.
           </p>
         </div>
-        <span class="badge">Conexión segura</span>
       </div>
 
       <form class="login__form" @submit.prevent="handleSubmit">

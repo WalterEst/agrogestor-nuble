@@ -512,7 +512,8 @@ app.get('/api/admin/dashboard', async (_req, res) => {
         ultimo_login: null
       })),
       solicitudes: [],
-      publicaciones: []
+      publicaciones: [],
+      reportes: mockReportes
     })
   }
 
@@ -560,8 +561,25 @@ app.get('/api/admin/dashboard', async (_req, res) => {
      ORDER BY p.creado_en DESC
         LIMIT 100`
     )
+    // Obtiene los tickets de soporte/reporte para que sean visibles en el panel admin
+    const [reportes] = await dataSource.pool.query(
+      `SELECT s.id,
+              s.asunto,
+              s.mensaje,
+              s.estado,
+              DATE_FORMAT(s.creado_en, '%Y-%m-%d') AS fecha,
+              s.respuesta,
+              u.id AS usuario_id,
+              u.nombre AS usuario_nombre,
+              u.apellido AS usuario_apellido,
+              u.email AS usuario_email
+         FROM soporte_tickets s
+    LEFT JOIN usuarios u ON s.usuario_id = u.id
+     ORDER BY s.creado_en DESC
+        LIMIT 100`
+    )
 
-    return res.json({ usuarios, solicitudes, publicaciones })
+    return res.json({ usuarios, solicitudes, publicaciones, reportes })
   } catch (error) {
     console.error('Error obteniendo datos de dashboard:', error.message)
   return res.status(500).json({ message: 'Error al cargar datos del panel' })
@@ -1003,7 +1021,8 @@ app.post(
 
 // 1. GET: Mis Publicaciones 
 app.get('/api/publisher/products', async (req, res) => {
-    const currentUserId = 1; 
+  const currentUserId = Number(req.query.userId || req.headers['x-user-id'] || null);
+  if (!currentUserId) return res.status(401).json({ message: 'Usuario no autenticado' });
     
     if (dataSource.mode === 'mock') {
         return res.json(mockPublicaciones.map(formatPublicationRow));
@@ -1093,11 +1112,17 @@ app.post('/api/publisher/products', upload.single('portada'), async (req, res) =
     }
 
 try {
+        const userId = Number(req.body.userId || req.query.userId || req.headers['x-user-id'] || null);
+
+        if (!userId) {
+          return res.status(401).json({ message: 'Usuario no autenticado' });
+        }
+
         const [result] = await dataSource.pool.query(
             `INSERT INTO publicaciones 
             (titulo, precio, stock, descripcion, usuario_id, estado_publicacion, visible, creado_en)
             VALUES (?, ?, ?, ?, ?, 'pendiente_revision', 1, NOW())`, 
-            [name, price, stock, description, 1]
+          [name, price, stock, description, userId]
         );
         
         const newProductId = result.insertId;
@@ -1158,7 +1183,9 @@ app.delete('/api/publisher/products/:id', async (req, res) => {
 // 6. GET: Obtener mi perfil
 app.get('/api/publisher/profile', async (req, res) => {
 
-    const userId = req.query.userId || 1;
+    const userId = Number(req.query.userId || req.headers['x-user-id'] || null);
+
+    if (!userId) return res.status(401).json({ message: 'Usuario no autenticado' });
 
     console.log(`Buscando perfil en BD para ID: ${userId}`);
 
@@ -1191,8 +1218,10 @@ app.get('/api/publisher/profile', async (req, res) => {
 // 7. PUT: Actualizar perfil
 app.put('/api/publisher/profile', async (req, res) => {
     
-    const userId = req.query.userId || 1;
+    const userId = Number(req.query.userId || req.headers['x-user-id'] || null);
     const { nombre, apellido, email, password, currentPassword } = req.body;
+
+    if (!userId) return res.status(401).json({ message: 'Usuario no autenticado' });
 
     if (dataSource.mode === 'mock') {
      
@@ -1211,7 +1240,7 @@ app.put('/api/publisher/profile', async (req, res) => {
         }
 
         query += ' WHERE id=?';
-        params.push(currentUserId);
+        params.push(userId);
 
         await dataSource.pool.query(query, params);
 
@@ -1232,8 +1261,9 @@ let mockReportes = [
 
 // 8. GET: Mis Reportes/Tickets
 app.get('/api/publisher/reports', async (req, res) => {
-    const userId = 1; // Hardcodeado
-    if (dataSource.mode === 'mock') return res.json(mockReportes);
+  const userId = Number(req.query.userId || req.headers['x-user-id'] || null);
+  if (!userId && dataSource.mode !== 'mock') return res.status(401).json({ message: 'Usuario no autenticado' });
+  if (dataSource.mode === 'mock') return res.json(mockReportes);
 
     try {
         const [rows] = await dataSource.pool.query(
@@ -1258,9 +1288,12 @@ app.post('/api/publisher/contact', async (req, res) => {
     }
 
     try {
+        const userId = Number(req.body.userId || req.query.userId || req.headers['x-user-id'] || null);
+        if (!userId) return res.status(401).json({ message: 'Usuario no autenticado' });
+
         await dataSource.pool.query(
-            `INSERT INTO soporte_tickets (usuario_id, asunto, mensaje, estado, creado_en) VALUES (?, ?, ?, 'pendiente', NOW())`,
-            [1, asunto, mensaje]
+          `INSERT INTO soporte_tickets (usuario_id, asunto, mensaje, estado, creado_en) VALUES (?, ?, ?, 'pendiente', NOW())`,
+          [userId, asunto, mensaje]
         );
         return res.status(201).json({ message: 'Mensaje enviado correctamente' });
     } catch (e) {
@@ -1268,6 +1301,69 @@ app.post('/api/publisher/contact', async (req, res) => {
         return res.status(500).json({ message: 'Error al enviar mensaje' });
     }
 });
+
+
+// PATCH: Actualizar/Responder un ticket (solo admin)
+app.patch(
+  '/api/admin/reportes/:id',
+  [body('estado').optional().isIn(['pendiente', 'resuelto', 'cerrado']), body('respuesta').optional().isString()],
+  async (req, res) => {
+    const errors = validationResult(req)
+    if (!errors.isEmpty()) return res.status(400).json({ message: 'Datos inválidos', errors: errors.array() })
+
+    const actorRoleId = getActorRoleId(req)
+    if (![ROLE_IDS.SUPER_ADMIN, ROLE_IDS.ADMIN].includes(actorRoleId)) {
+      return res.status(403).json({ message: 'No tienes permisos para responder tickets' })
+    }
+
+    const { id } = req.params
+    const { respuesta, estado } = req.body
+
+    if (dataSource.mode === 'mock') {
+      const idx = mockReportes.findIndex((t) => String(t.id) === String(id))
+      if (idx === -1) return res.status(404).json({ message: 'Ticket no encontrado (mock)' })
+      if (typeof respuesta === 'string') mockReportes[idx].respuesta = respuesta
+      if (estado) mockReportes[idx].estado = estado
+      return res.json({ message: 'Ticket actualizado (mock)', ticket: mockReportes[idx] })
+    }
+
+    try {
+      // Construir query dinámico
+      const patches = []
+      const values = []
+      if (typeof respuesta === 'string') {
+        patches.push('respuesta = ?')
+        values.push(respuesta)
+      }
+      if (estado) {
+        patches.push('estado = ?')
+        values.push(estado)
+      }
+
+      if (!patches.length) return res.status(400).json({ message: 'No se enviaron campos para actualizar' })
+
+      // No intentamos actualizar columnas no existentes (p.ej. actualizado_en)
+      const sql = `UPDATE soporte_tickets SET ${patches.join(', ')} WHERE id = ? LIMIT 1`
+      values.push(id)
+
+      const [result] = await dataSource.pool.query(sql, values)
+      if (result.affectedRows === 0) return res.status(404).json({ message: 'Ticket no encontrado' })
+
+      const [rows] = await dataSource.pool.query(
+        `SELECT s.id, s.asunto, s.mensaje, s.estado, s.respuesta, DATE_FORMAT(s.creado_en, '%Y-%m-%d') as fecha, u.id AS usuario_id, u.nombre AS usuario_nombre, u.email AS usuario_email
+           FROM soporte_tickets s
+      LEFT JOIN usuarios u ON s.usuario_id = u.id
+          WHERE s.id = ? LIMIT 1`,
+        [id]
+      )
+
+      return res.json({ message: 'Ticket actualizado', ticket: rows[0] })
+    } catch (e) {
+      console.error('Error actualizando ticket:', e.message)
+      return res.status(500).json({ message: 'Error al actualizar ticket' })
+    }
+  }
+)
 
 // Inicializa el pool y levanta la API
 bootstrapPool().finally(() => {

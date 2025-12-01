@@ -6,6 +6,7 @@ import { useSessionStore } from '../stores/session'
 const usuarios = ref([])
 const solicitudesPublicacion = ref([])
 const publicaciones = ref([])
+const reportes = ref([])
 const notasModeracion = ref('')
 const mensajeSistema = ref('')
 const cargando = ref(false)
@@ -64,7 +65,8 @@ const router = useRouter()
 const totales = computed(() => ({
   usuarios: usuarios.value.length,
   solicitudes: solicitudesPublicacion.value.length,
-  publicaciones: publicaciones.value.length
+  publicaciones: publicaciones.value.length,
+  reportes: reportes.value.length
 }))
 
 const solicitudesFiltradas = computed(() => {
@@ -128,6 +130,7 @@ const sincronizarDashboard = async () => {
           visibilidad: normalizarVisibilidad(item.visibilidad || item.estado_publicacion)
         }))
       : []
+    reportes.value = Array.isArray(payload.reportes) ? payload.reportes : []
     registrarAccion('Datos del panel sincronizados con backend.')
   } catch (error) {
     registrarAccion(error.message || 'Error al cargar datos. Revisa la conexión con el backend.')
@@ -158,6 +161,59 @@ const actualizarEstadoPublicacion = async (solicitud, estado_publicacion) => {
 }
 
 const solicitudEnRevision = ref(null)
+
+// Reportes: UI state
+const replyingTo = ref(null) // ticket id currently showing reply form
+const replyText = ref('')
+const reportLoading = ref(null)
+
+const toggleReply = (ticket) => {
+  if (!ticket || !ticket.id) return
+  if (replyingTo.value === ticket.id) {
+    replyingTo.value = null
+    replyText.value = ''
+    return
+  }
+  replyingTo.value = ticket.id
+  replyText.value = ticket.respuesta || ''
+}
+
+const sendReply = async (ticket, markResolved = false) => {
+  if (!ticket || !ticket.id) return
+  reportLoading.value = ticket.id
+
+  try {
+    const payload = {}
+    if (replyText.value && replyText.value.trim().length) payload.respuesta = replyText.value.trim()
+    if (markResolved) payload.estado = 'resuelto'
+
+    const response = await fetch(`${apiBase}/admin/reportes/${ticket.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-role': sessionStore.roleId || ''
+      },
+      body: JSON.stringify(payload)
+    })
+
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(data?.message || 'No fue posible actualizar el ticket')
+
+    // actualizar en el array local
+    const idx = reportes.value.findIndex((r) => String(r.id) === String(ticket.id))
+    if (idx >= 0) {
+      reportes.value.splice(idx, 1, data.ticket)
+    }
+
+    registrarAccion('Respuesta enviada al ticket.')
+    replyingTo.value = null
+    replyText.value = ''
+  } catch (e) {
+    registrarAccion(e.message || 'Error al enviar la respuesta')
+  } finally {
+    reportLoading.value = null
+  }
+}
 
 const procesarRevision = async (solicitud, accion) => {
   if (!solicitud?.id) {
@@ -344,14 +400,7 @@ onMounted(sincronizarDashboard)
             Los datos se cargan desde el backend cuando está disponible; si no hay registros verás los estados vacíos.
           </p>
         </div>
-      <div class="hero__actions">
-        <button class="btn btn--primary" type="button" @click="registrarAccion('Acción rápida programada para ejecutarse con el backend.')">
-          Crear rol o permiso
-        </button>
-        <button class="btn btn--ghost" type="button" @click="registrarAccion('Sincronización pendiente de conexión.')">
-          Sincronizar cambios
-        </button>
-      </div>
+
     </header>
 
     <div class="grid-responsive admin__stats">
@@ -370,6 +419,11 @@ onMounted(sincronizarDashboard)
         <p class="stat__value">{{ totales.publicaciones }}</p>
         <p class="stat__hint">Controla qué publicaciones continúan disponibles.</p>
       </article>
+      <article class="card stat">
+        <p class="stat__label">Tickets / Reportes</p>
+        <p class="stat__value">{{ totales.reportes }}</p>
+        <p class="stat__hint">Solicitudes de soporte y reportes de usuarios.</p>
+      </article>
     </div>
 
     <section class="card admin__panel">
@@ -382,7 +436,6 @@ onMounted(sincronizarDashboard)
           <button class="btn btn--ghost" type="button" @click="sincronizarDashboard" :disabled="cargando">
             {{ cargando ? 'Sincronizando...' : 'Refrescar datos' }}
           </button>
-          <button class="btn btn--primary" type="button" @click="registrarAccion('Exportación pendiente de backend.')">Exportar</button>
         </div>
       </header>
 
@@ -551,8 +604,110 @@ onMounted(sincronizarDashboard)
       </article>
     </section>
 
+    <section class="admin__grid">
+      <article class="card admin__reportes">
+        <header class="panel__header">
+          <div>
+            <h2>Tickets / Reportes</h2>
+            <p class="muted">Revisa y responde los reportes enviados por los usuarios.</p>
+          </div>
+        </header>
+
+        <div v-if="reportes.length" class="list">
+          <article v-for="r in reportes" :key="r.id" class="list__item">
+            <div class="list__info">
+              <p class="list__title">{{ r.asunto }}</p>
+              <p class="muted">{{ r.usuario_nombre || r.usuario?.nombre || 'Usuario desconocido' }} · {{ r.usuario_email || r.usuario?.email || '' }}</p>
+            </div>
+            <div class="list__meta">
+              <p class="muted">{{ r.fecha }} • <strong>{{ r.estado || 'pendiente' }}</strong></p>
+              <div class="list__buttons">
+                <button class="btn btn--ghost" type="button" @click="() => { navigator.clipboard?.writeText(r.mensaje || '') }">Copiar Mensaje</button>
+                <button class="btn btn--ghost" type="button" @click.stop.prevent="toggleReply(r)">
+                  {{ replyingTo === r.id ? 'Cerrar' : 'Responder' }}
+                </button>
+                <button class="btn btn--primary" type="button" :disabled="reportLoading === r.id" @click.stop.prevent="sendReply(r, true)">
+                  {{ reportLoading === r.id ? 'Enviando...' : 'Marcar resuelto' }}
+                </button>
+              </div>
+            </div>
+            <div class="report-body" style="margin-top:0.6rem;">
+              <p>{{ r.mensaje }}</p>
+              <div v-if="r.respuesta" class="admin-reply">
+                <p><strong>Respuesta:</strong> {{ r.respuesta }}</p>
+              </div>
+
+              <div v-if="replyingTo === r.id" class="reply-form" style="margin-top:0.8rem;">
+                <textarea v-model="replyText" rows="4" class="pub-textarea" placeholder="Escribe tu respuesta aquí..."></textarea>
+                <div style="margin-top:0.5rem; text-align:right;">
+                  <button class="btn btn--ghost" type="button" @click.prevent="toggleReply(r)">Cancelar</button>
+                  <button class="btn btn--primary" type="button" :disabled="reportLoading === r.id" @click.prevent="sendReply(r, false)">
+                    {{ reportLoading === r.id ? 'Enviando...' : 'Enviar respuesta' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+        <div v-else class="empty-state">No hay tickets o reportes por el momento.</div>
+      </article>
+    </section>
+
     <p v-if="mensajeSistema" class="alert alert--info">{{ mensajeSistema }}</p>
   </section>
 </template>
 
 <style scoped src="../estilos/AdminDashboard.css"></style>
+
+<style scoped>
+/* Keep styles minimal and consistent with other components (card/pill/btn) */
+:root {
+  --brand: #059669;
+  --brand-dark: #064e3b;
+  --muted: #6b7280;
+  --card-bg: #ffffff;
+}
+
+.admin__reportes { padding: 0; }
+.admin__reportes .list { display:flex; flex-direction:column; gap:0.85rem; }
+
+.admin__reportes .list__item {
+  display:flex;
+  gap:1rem;
+  align-items:flex-start;
+  background: var(--card-bg);
+  border: 1px solid rgba(6,78,59,0.06);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+}
+
+.admin__reportes .list__info { flex:1; }
+.admin__reportes .list__title { margin:0 0 0.18rem 0; font-weight:700; color:var(--brand-dark); font-size:1rem; }
+.admin__reportes .list__info .muted { margin:0; color:var(--muted); font-size:0.92rem; }
+
+.admin__reportes .list__meta { width:220px; display:flex; flex-direction:column; align-items:flex-end; gap:0.5rem; }
+.admin__reportes .meta-top { color:var(--muted); font-size:0.9rem; }
+
+/* Use existing pill styles where possible */
+.admin__reportes .status-pill { font-weight:700; padding:6px 10px; border-radius:999px; font-size:0.78rem; }
+.admin__reportes .status-pendiente { background:#fff7ed; color:#92400e; border:1px solid #fbe6c9; }
+.admin__reportes .status-resuelto { background:#ecfdf5; color:#065f46; border:1px solid #c8f7df; }
+.admin__reportes .status-cerrado { background:#f3f4f6; color:#374151; border:1px solid #e6e8eb; }
+
+.admin__reportes .list__buttons { display:flex; gap:0.5rem; }
+.admin__reportes .list__buttons .btn { padding:0.45rem 0.85rem; border-radius:999px; }
+
+.admin__reportes .report-body { width:100%; margin-top:0.6rem; color:#24382f; line-height:1.5; }
+.admin__reportes .admin-reply { margin-top:0.6rem; background:#f6fffa; border-left:4px solid var(--brand); padding:0.7rem; border-radius:6px; }
+
+.admin__reportes .reply-form { margin-top:0.8rem; display:flex; flex-direction:column; gap:0.6rem; }
+.admin__reportes .pub-textarea { width:100%; min-height:100px; padding:0.7rem; border-radius:8px; border:1px solid #e6f0ea; font-size:0.95rem; }
+
+/* Responsive: stack and align like other admin lists */
+@media (max-width: 880px) {
+  .admin__reportes .list__item { flex-direction:column; }
+  .admin__reportes .list__meta { width:100%; align-items:flex-start; }
+  .admin__reportes .list__buttons { justify-content:flex-start; }
+}
+
+</style>
