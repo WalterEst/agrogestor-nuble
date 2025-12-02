@@ -1118,6 +1118,8 @@ app.post('/api/publisher/products', upload.single('portada'), async (req, res) =
     console.log("-----------------------------------------");
 
     const { name, price, stock, description } = req.body;
+    const rawCategoryId = req.body.categoryId || req.body.categoria_id || req.body.category_id
+    const categoryName = req.body.category || req.body.categoria || null
     const file = req.file;
     const portadaUrl = file ? `http://localhost:${PORT}/uploads/${file.filename}` : null;
 
@@ -1130,28 +1132,141 @@ app.post('/api/publisher/products', upload.single('portada'), async (req, res) =
 try {
         const userId = Number(req.body.userId || req.query.userId || req.headers['x-user-id'] || null);
 
+        console.log('=== DEBUG CATEGORIA ===');
+        console.log('req.body completo:', req.body);
+        console.log('rawCategoryId recibido:', rawCategoryId, 'tipo:', typeof rawCategoryId);
+        console.log('categoryName recibido:', categoryName);
+        console.log('======================');
+        console.log('Crear producto recibido - category inputs:', { rawCategoryId, categoryName });
+
         if (!userId) {
           return res.status(401).json({ message: 'Usuario no autenticado' });
         }
 
-        const [result] = await dataSource.pool.query(
-            `INSERT INTO publicaciones 
-            (titulo, precio, stock, descripcion, usuario_id, estado_publicacion, visible, creado_en)
-            VALUES (?, ?, ?, ?, ?, 'pendiente_revision', 1, NOW())`, 
-          [name, price, stock, description, userId]
-        );
-        
+        // Modo mock: insertar en arreglo en memoria
+        if (dataSource.mode === 'mock') {
+          const nextId = mockPublicaciones.reduce((max, p) => Math.max(max, p.id), 0) + 1;
+          const autor = (mockUsers.find(u => u.id === userId) || mockUsers[0]).nombre || 'Desconocido';
+          const newPub = {
+            id: nextId,
+            titulo: name,
+            descripcion: description || '',
+            precio: Number(price) || 0,
+            moneda: 'CLP',
+            categoria: categoryName || 'Sin categoría',
+            autor,
+            fecha: new Date().toISOString().split('T')[0],
+            estado_publicacion: 'pendiente_revision',
+            portada: portadaUrl,
+            stock: Number(stock) || 0,
+            usuario_id: userId
+          };
+          mockPublicaciones.unshift(newPub);
+          return res.status(201).json({ message: 'Creado (mock)', id: nextId, publicacion: formatPublicationRow(newPub) });
+        }
+
+        // DB mode: resolver category id si se envía nombre
+        let categoryId = null;
+        if (rawCategoryId !== undefined && rawCategoryId !== null && rawCategoryId !== '') {
+          const parsed = Number(rawCategoryId);
+          console.log('Intentando parsear categoryId:', rawCategoryId, '-> parsed:', parsed, 'isInteger:', Number.isInteger(parsed));
+          if (Number.isInteger(parsed) && parsed > 0) {
+            categoryId = parsed;
+            console.log('categoryId establecido a:', categoryId);
+          }
+        }
+
+        if (!categoryId && categoryName) {
+          try {
+            const [catRows] = await dataSource.pool.query('SELECT id FROM categorias WHERE nombre = ? LIMIT 1', [categoryName]);
+            if (catRows.length) {
+              categoryId = catRows[0].id;
+            } else {
+              // Si no existe, crear la categoría automáticamente y usar su id
+              try {
+                const [insertCat] = await dataSource.pool.query(
+                  'INSERT INTO categorias (nombre, activo, creado_en) VALUES (?, 1, NOW())',
+                  [categoryName]
+                );
+                if (insertCat && insertCat.insertId) {
+                  categoryId = insertCat.insertId;
+                  console.log('Categoria creada automáticamente:', categoryName, '-> id', categoryId);
+                }
+              } catch (innerErr) {
+                // Si la inserción falla por concurrencia/duplicate, intentar leer de nuevo
+                console.warn('Error creando categoria, reintentando select:', innerErr.message);
+                try {
+                  const [retryRows] = await dataSource.pool.query('SELECT id FROM categorias WHERE nombre = ? LIMIT 1', [categoryName]);
+                  if (retryRows.length) categoryId = retryRows[0].id;
+                } catch (retryErr) {
+                  console.warn('Reintento fallido al resolver categoria:', retryErr.message);
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('No se pudo resolver categoria por nombre:', e.message);
+          }
+        }
+
+        // Construir query dinámico para incluir categoria si aplica
+        const columns = ['titulo', 'precio', 'stock', 'descripcion', 'usuario_id', 'estado_publicacion', 'visible', 'creado_en'];
+        const placeholders = ['?', '?', '?', '?', '?', "'pendiente_revision'", '1', 'NOW()'];
+        const params = [name, Number(price) || 0, Number(stock) || 0, description || '', userId];
+
+        if (categoryId) {
+          columns.splice(4, 0, 'categoria_id'); // insert before usuario_id
+          placeholders.splice(4, 0, '?');
+          params.splice(4, 0, categoryId);
+        }
+
+        const sql = `INSERT INTO publicaciones (${columns.join(', ')}) VALUES (${placeholders.join(', ')})`;
+
+        const [result] = await dataSource.pool.query(sql, params);
+
         const newProductId = result.insertId;
 
         if (portadaUrl) {
-            await dataSource.pool.query(
-                `INSERT INTO publicaciones_imagenes (publicacion_id, ruta_imagen, es_portada, orden)
-                 VALUES (?, ?, 1, 1)`,
-                [newProductId, portadaUrl]
-            );
+          await dataSource.pool.query(
+            `INSERT INTO publicaciones_imagenes (publicacion_id, ruta_imagen, es_portada, orden)
+             VALUES (?, ?, 1, 1)`,
+            [newProductId, portadaUrl]
+          );
         }
 
-        return res.status(201).json({ message: 'Creado', id: newProductId });
+        // Recuperar la publicación recién creada con nombre de categoría para devolverlo en la respuesta
+        try {
+          const [rowsPub] = await dataSource.pool.query(
+            `SELECT p.id,
+                p.titulo,
+                p.descripcion,
+                p.precio,
+                p.moneda,
+                COALESCE(c.nombre, 'Sin categoría') AS categoria,
+                TRIM(CONCAT(COALESCE(u.nombre, ''), ' ', COALESCE(u.apellido, ''))) AS autor,
+                DATE_FORMAT(p.creado_en, '%Y-%m-%d') AS fecha,
+                p.estado_publicacion,
+                (
+                  SELECT img.ruta_imagen
+                  FROM publicaciones_imagenes img
+                   WHERE img.publicacion_id = p.id
+                ORDER BY img.es_portada DESC, img.orden ASC, img.id ASC
+                   LIMIT 1
+                ) AS portada
+               FROM publicaciones p
+            LEFT JOIN usuarios u ON p.usuario_id = u.id
+            LEFT JOIN categorias c ON p.categoria_id = c.id
+              WHERE p.id = ?
+              LIMIT 1`,
+            [newProductId]
+          );
+
+          const publicacion = rowsPub.length ? formatPublicationRow(rowsPub[0]) : { id: newProductId };
+          console.log('Publicación creada en BD:', publicacion);
+          return res.status(201).json({ message: 'Creado', id: newProductId, publicacion });
+        } catch (e) {
+          console.warn('No se pudo recuperar la publicación creada:', e.message);
+          return res.status(201).json({ message: 'Creado', id: newProductId });
+        }
 
     } catch (error) {
         console.error("ERROR SQL DETALLADO:", error); 

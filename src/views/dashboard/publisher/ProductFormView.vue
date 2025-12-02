@@ -93,8 +93,10 @@ const saveProduct = async () => {
     formData.append('stock', form.value.stock);
     formData.append('description', form.value.description);
     
-    // ENVIAMOS EL ID DE LA CATEGORÍA
-    formData.append('category_id', form.value.category_id);
+    // ENVIAMOS EL ID DE LA CATEGORÍA (como string)
+    if (form.value.category_id) {
+      formData.append('category_id', String(form.value.category_id));
+    }
     
     if (portadaFile.value) {
       formData.append('portada', portadaFile.value);
@@ -138,8 +140,8 @@ const saveProduct = async () => {
           
           <div class="pub-field">
             <label>Categoría *</label>
-            <select v-model="form.category_id" class="pub-input" :class="{'input-error': errores.category}">
-              <option value="" disabled>-- Selecciona --</option>
+            <select v-model.number="form.category_id" class="pub-input" :class="{'input-error': errores.category}">
+              <option :value="null" disabled>-- Selecciona --</option>
               <option v-for="cat in categories" :key="cat.id" :value="cat.id">
                 {{ cat.nombre }}
               </option>
