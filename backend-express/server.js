@@ -1365,6 +1365,30 @@ app.patch(
   }
 )
 
+// RUTA DE CATEGORÍAS 
+app.get('/api/categories', async (req, res) => {
+    // Si estamos en modo Mock (pruebas sin BD)
+    if (dataSource.mode === 'mock') {
+        return res.json([
+            { id: 1, nombre: 'General' },
+            { id: 2, nombre: 'Frutas y Verduras' },
+            { id: 3, nombre: 'Herramientas' }
+        ]);
+    }
+
+    try {
+        // Consulta real a la base de datos
+        // Solo traemos las categorías activas y ordenadas alfabéticamente
+        const [rows] = await dataSource.pool.query(
+            'SELECT id, nombre FROM categorias WHERE activo = 1 ORDER BY nombre ASC'
+        );
+        return res.json(rows);
+    } catch (error) {
+        console.error("Error cargando categorías:", error);
+        return res.status(500).json({ message: 'Error interno al cargar categorías' });
+    }
+});
+
 // Inicializa el pool y levanta la API
 bootstrapPool().finally(() => {
   app.listen(PORT, () => {

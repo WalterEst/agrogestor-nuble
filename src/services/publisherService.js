@@ -2,6 +2,7 @@ import api from './api';
 
 export default {
   
+  // Helper interno para leer el ID del usuario desde las distintas sesiones posibles
   _readStoredUserId() {
     try {
       const raw = localStorage.getItem('marketvue.session');
@@ -27,19 +28,25 @@ export default {
     return null;
   },
 
+  // --- PRODUCTOS ---
+
   getMyProducts() {
     const userId = this._readStoredUserId();
     return api.get(userId ? `/publisher/products?userId=${userId}` : '/publisher/products');
   },
 
-
   getProductById(id) {
     return api.get(`/publisher/products/${id}`);
   },
 
- createProduct(formData) {
+  // ESTA ES LA QUE FALTABA PARA QUE FUNCIONE EL SELECTOR
+  getCategories() {
+    return api.get('/categories');
+  },
+
+  createProduct(formData) {
     const userId = this._readStoredUserId();
-    // si es FormData, añadir userId al body
+    // Si es FormData, añadir userId al body manualmente
     if (formData && typeof formData.append === 'function' && userId) {
       formData.append('userId', String(userId));
     }
@@ -47,13 +54,15 @@ export default {
   },
  
   updateProduct(id, data) {
+    // Nota: Si data es FormData, axios lo maneja, pero si necesitas userId en update, agrégalo aquí también
     return api.put(`/publisher/products/${id}`, data);
   },
-
 
   deleteProduct(id) {
     return api.delete(`/publisher/products/${id}`);
   },
+
+  // --- PERFIL ---
 
   getProfile() {
     // Leer la sesión estándar (`marketvue.session`) cuando exista
@@ -120,7 +129,9 @@ export default {
 
     return api.put(userId ? `/publisher/profile?userId=${userId}` : `/publisher/profile`, data);
   },
+
   // --- SOPORTE ---
+  
   getMyReports() {
     const userId = this._readStoredUserId();
     return api.get(userId ? `/publisher/reports?userId=${userId}` : '/publisher/reports');
