@@ -23,6 +23,13 @@ export const useSessionStore = defineStore('session', {
   getters: {
     usuario: (state) => state.session?.usuario || null,
     isAuthenticated: (state) => Boolean(state.session?.usuario),
+    avatarUrl: (state) =>
+      state.session?.usuario?.avatar ||
+      state.session?.usuario?.avatarUrl ||
+      state.session?.usuario?.foto ||
+      state.session?.usuario?.foto_url ||
+      state.session?.usuario?.imageUrl ||
+      null,
     roleId: (state) => Number(state.session?.usuario?.rol_id ?? state.session?.usuario?.rolId ?? state.session?.usuario?.roleId),
     roleName: (state) => String(state.session?.usuario?.rol ?? state.session?.usuario?.role ?? '').toLowerCase(),
     isAdmin() {

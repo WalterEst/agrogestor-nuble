@@ -8,12 +8,14 @@
       </div>
     </div>
 
-    <nav class="navbar__links" v-if="isAuthenticated">
-      <RouterLink to="/publicaciones" class="navbar__link">Publicaciones</RouterLink>
-      <RouterLink v-if="isPublisher" to="/panel/publicador/mis-productos" class="navbar__link">Mi Panel</RouterLink>
-      <RouterLink v-if="isAdmin" to="/admin" class="navbar__link">Administrador</RouterLink>
-      <button class="navbar__link navbar__button" type="button" @click="logout">Salir</button>
-    </nav>
+    <div class="navbar__actions" v-if="isAuthenticated">
+      <nav class="navbar__links">
+        <RouterLink to="/publicaciones" class="navbar__link">Publicaciones</RouterLink>
+        <RouterLink v-if="isPublisher" to="/panel/publicador/mis-productos" class="navbar__link">Mi Panel</RouterLink>
+        <RouterLink v-if="isAdmin" to="/admin" class="navbar__link">Administrador</RouterLink>
+      </nav>
+      <AvatarMenu @logout="logout" />
+    </div>
 
     <nav class="navbar__links" v-else>
       <RouterLink to="/publicaciones" class="navbar__link">Publicaciones</RouterLink>
@@ -27,6 +29,7 @@
 import { RouterLink, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useSessionStore } from '../stores/session'
+import AvatarMenu from './AvatarMenu.vue'
 
 const router = useRouter()
 const sessionStore = useSessionStore()
