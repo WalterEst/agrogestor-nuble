@@ -36,6 +36,14 @@ const getStatusLabel = (status) => {
   return map[status] || String(status).charAt(0).toUpperCase() + String(status).slice(1);
 };
 
+const formatDate = (dateString) => {
+  if (!dateString) return 'Reciente';
+  if (dateString.includes('T')) {
+    return dateString.split('T')[0];
+  }
+  return dateString;
+};
+
 const goToEdit = () => {
   if (product.value) {
     router.push({ name: 'publisher-edit-product', params: { id: product.value.id } });
@@ -103,7 +111,7 @@ const handleDelete = async () => {
           </div>
           <div class="meta-item">
             <span class="label">Fecha</span>
-            <span class="value">{{ product.fecha || 'Reciente' }}</span>
+            <span class="value">{{ formatDate(product.fecha) }}</span>
           </div>
         </div>
 

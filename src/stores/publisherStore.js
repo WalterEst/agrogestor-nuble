@@ -39,6 +39,20 @@ export const usePublisherStore = defineStore('publisher', {
         } catch (error) {
             console.error(error);
         }
+    },
+    async updateProduct(id, formData) {
+        try {
+            const { data } = await api.put(`/publisher/products/${id}`, formData);
+            // Actualiza el producto en el store localmente
+            const index = this.products.findIndex(p => p.id === Number(id));
+            if (index !== -1) {
+                this.products[index] = { ...this.products[index], ...data.publicacion };
+            }
+            return data;
+        } catch (error) {
+            console.error(error);
+            throw error;
+        }
     }
   }
 });

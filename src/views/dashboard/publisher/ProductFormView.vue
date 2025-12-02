@@ -12,7 +12,6 @@ const productId = route.params.id;
 const isEditMode = computed(() => !!productId);
 const isLoading = ref(false);
 
-// Lista de categorías que viene del backend
 const categories = ref([]);
 
 const form = ref({
@@ -20,7 +19,7 @@ const form = ref({
   price: '',
   stock: '',
   description: '',
-  category_id: '' // Aquí guardamos el ID seleccionado
+  category_id: ''
 });
 
 const portadaFile = ref(null);
@@ -38,11 +37,9 @@ const handleFileUpload = (event) => {
 onMounted(async () => {
   isLoading.value = true;
   try {
-    // 1. CARGAR CATEGORÍAS
     const catResponse = await publisherService.getCategories();
     categories.value = catResponse.data;
 
-    // 2. Si es edición, cargar datos del producto
     if (isEditMode.value) {
       const { data } = await publisherService.getProductById(productId);
       form.value = {
@@ -50,7 +47,6 @@ onMounted(async () => {
         price: data.price || data.precio,
         stock: data.stock || 0,
         description: data.description,
-        // Aseguramos que el ID de categoría se asigne
         category_id: data.categoria_id || data.category || '' 
       };
       if (data.portada) portadaPreview.value = data.portada;
@@ -69,7 +65,6 @@ const validarFormulario = () => {
   if (!form.value.name) errores.value.name = 'Nombre requerido';
   if (!form.value.price) errores.value.price = 'Precio requerido';
   
-  // Validación de categoría
   if (!form.value.category_id) {
       errores.value.category = 'Debes seleccionar una categoría';
       esValido = false;
@@ -93,7 +88,6 @@ const saveProduct = async () => {
     formData.append('stock', form.value.stock);
     formData.append('description', form.value.description);
     
-    // ENVIAMOS EL ID DE LA CATEGORÍA (como string)
     if (form.value.category_id) {
       formData.append('category_id', String(form.value.category_id));
     }
@@ -103,8 +97,8 @@ const saveProduct = async () => {
     }
 
     if (isEditMode.value) {
-       // Lógica de update pendiente...
-       alert("Edición enviada (verificar backend)");
+       await publisherService.updateProduct(productId, formData);
+       alert("¡Producto actualizado con éxito!");
     } else {
        await publisherService.createProduct(formData);
        alert("¡Producto creado con éxito!");
