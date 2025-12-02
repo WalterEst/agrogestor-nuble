@@ -609,47 +609,128 @@ onMounted(sincronizarDashboard)
         <header class="panel__header">
           <div>
             <h2>Tickets / Reportes</h2>
-            <p class="muted">Revisa y responde los reportes enviados por los usuarios.</p>
+            <p class="muted">
+              Revisa, responde y marca como resueltos los reportes enviados por los usuarios.
+            </p>
+          </div>
+          <div v-if="reportes.length" class="badge-counter">
+            <span class="pill pill--soft">
+              {{ reportes.length }} {{ reportes.length === 1 ? 'ticket' : 'tickets' }}
+            </span>
           </div>
         </header>
 
-        <div v-if="reportes.length" class="list">
-          <article v-for="r in reportes" :key="r.id" class="list__item">
-            <div class="list__info">
-              <p class="list__title">{{ r.asunto }}</p>
-              <p class="muted">{{ r.usuario_nombre || r.usuario?.nombre || 'Usuario desconocido' }} · {{ r.usuario_email || r.usuario?.email || '' }}</p>
-            </div>
-            <div class="list__meta">
-              <p class="muted">{{ r.fecha }} • <strong>{{ r.estado || 'pendiente' }}</strong></p>
-              <div class="list__buttons">
-                <button class="btn btn--ghost" type="button" @click="() => { navigator.clipboard?.writeText(r.mensaje || '') }">Copiar Mensaje</button>
-                <button class="btn btn--ghost" type="button" @click.stop.prevent="toggleReply(r)">
-                  {{ replyingTo === r.id ? 'Cerrar' : 'Responder' }}
-                </button>
-                <button class="btn btn--primary" type="button" :disabled="reportLoading === r.id" @click.stop.prevent="sendReply(r, true)">
-                  {{ reportLoading === r.id ? 'Enviando...' : 'Marcar resuelto' }}
-                </button>
+        <div v-if="reportes.length" class="tickets">
+          <article
+            v-for="r in reportes"
+            :key="r.id"
+            class="ticket"
+          >
+            <header class="ticket__header">
+              <div class="ticket__heading">
+                <p class="ticket__title">{{ r.asunto }}</p>
+                <p class="ticket__meta">
+                  {{ r.usuario_nombre || r.usuario?.nombre || 'Usuario desconocido' }}
+                  ·
+                  <span class="ticket__email">
+                    {{ r.usuario_email || r.usuario?.email || 'Sin correo' }}
+                  </span>
+                </p>
               </div>
-            </div>
-            <div class="report-body" style="margin-top:0.6rem;">
-              <p>{{ r.mensaje }}</p>
-              <div v-if="r.respuesta" class="admin-reply">
-                <p><strong>Respuesta:</strong> {{ r.respuesta }}</p>
+              <div class="ticket__status">
+                <span
+                  class="status-pill"
+                  :class="{
+                    'status-pill--pending': (r.estado || 'pendiente') === 'pendiente',
+                    'status-pill--resolved': r.estado === 'resuelto',
+                    'status-pill--closed': r.estado === 'cerrado'
+                  }"
+                >
+                  {{ r.estado || 'pendiente' }}
+                </span>
+                <p class="ticket__date">
+                  {{ r.fecha }}
+                </p>
+              </div>
+            </header>
+
+            <div class="ticket__body">
+              <details class="ticket__message" open>
+                <summary>Mensaje del usuario</summary>
+                <p>{{ r.mensaje }}</p>
+              </details>
+
+              <div v-if="r.respuesta" class="ticket__reply">
+                <p class="ticket__reply-label">Respuesta enviada</p>
+                <p>{{ r.respuesta }}</p>
               </div>
 
-              <div v-if="replyingTo === r.id" class="reply-form" style="margin-top:0.8rem;">
-                <textarea v-model="replyText" rows="4" class="pub-textarea" placeholder="Escribe tu respuesta aquí..."></textarea>
-                <div style="margin-top:0.5rem; text-align:right;">
-                  <button class="btn btn--ghost" type="button" @click.prevent="toggleReply(r)">Cancelar</button>
-                  <button class="btn btn--primary" type="button" :disabled="reportLoading === r.id" @click.prevent="sendReply(r, false)">
-                    {{ reportLoading === r.id ? 'Enviando...' : 'Enviar respuesta' }}
+              <div
+                v-if="replyingTo === r.id"
+                class="ticket__reply-form"
+              >
+                <label class="field field--stack">
+                  <span>Responder ticket</span>
+                  <textarea
+                    v-model="replyText"
+                    rows="4"
+                    class="ticket__textarea"
+                    placeholder="Escribe tu respuesta para el usuario…"
+                  ></textarea>
+                </label>
+                <div class="ticket__reply-actions">
+                  <button
+                    class="btn btn--ghost"
+                    type="button"
+                    @click.prevent="toggleReply(r)"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    class="btn btn--primary"
+                    type="button"
+                    :disabled="reportLoading === r.id"
+                    @click.prevent="sendReply(r, false)"
+                  >
+                    {{ reportLoading === r.id ? 'Enviando…' : 'Enviar respuesta' }}
                   </button>
                 </div>
               </div>
             </div>
+
+            <footer class="ticket__footer">
+              <button
+                class="btn btn--ghost"
+                type="button"
+                @click="() => { navigator.clipboard?.writeText(r.mensaje || '') }"
+              >
+                Copiar mensaje
+              </button>
+
+              <div class="ticket__footer-right">
+                <button
+                  class="btn btn--ghost"
+                  type="button"
+                  @click.stop.prevent="toggleReply(r)"
+                >
+                  {{ replyingTo === r.id ? 'Cerrar edición' : (r.respuesta ? 'Editar respuesta' : 'Responder') }}
+                </button>
+                <button
+                  class="btn btn--primary"
+                  type="button"
+                  :disabled="reportLoading === r.id"
+                  @click.stop.prevent="sendReply(r, true)"
+                >
+                  {{ reportLoading === r.id ? 'Enviando…' : 'Marcar resuelto' }}
+                </button>
+              </div>
+            </footer>
           </article>
         </div>
-        <div v-else class="empty-state">No hay tickets o reportes por el momento.</div>
+
+        <div v-else class="empty-state">
+          No hay tickets o reportes por el momento.
+        </div>
       </article>
     </section>
 
@@ -660,7 +741,6 @@ onMounted(sincronizarDashboard)
 <style scoped src="../estilos/AdminDashboard.css"></style>
 
 <style scoped>
-/* Keep styles minimal and consistent with other components (card/pill/btn) */
 :root {
   --brand: #059669;
   --brand-dark: #064e3b;
@@ -668,46 +748,231 @@ onMounted(sincronizarDashboard)
   --card-bg: #ffffff;
 }
 
-.admin__reportes { padding: 0; }
-.admin__reportes .list { display:flex; flex-direction:column; gap:0.85rem; }
+.admin__reportes .panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
 
-.admin__reportes .list__item {
-  display:flex;
-  gap:1rem;
-  align-items:flex-start;
+
+.badge-counter {
+  display: flex;
+  align-items: center;
+}
+
+.pill--soft {
+  background: #ecfdf5;
+  color: #047857;
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid #bbf7d0;
+}
+
+.tickets {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.ticket {
   background: var(--card-bg);
-  border: 1px solid rgba(6,78,59,0.06);
-  border-radius: 10px;
-  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  padding: 1rem 1.1rem;
+  border: 1px solid rgba(15, 118, 110, 0.06);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
-.admin__reportes .list__info { flex:1; }
-.admin__reportes .list__title { margin:0 0 0.18rem 0; font-weight:700; color:var(--brand-dark); font-size:1rem; }
-.admin__reportes .list__info .muted { margin:0; color:var(--muted); font-size:0.92rem; }
+.ticket__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
 
-.admin__reportes .list__meta { width:220px; display:flex; flex-direction:column; align-items:flex-end; gap:0.5rem; }
-.admin__reportes .meta-top { color:var(--muted); font-size:0.9rem; }
+.ticket__heading {
+  flex: 1;
+}
 
-/* Use existing pill styles where possible */
-.admin__reportes .status-pill { font-weight:700; padding:6px 10px; border-radius:999px; font-size:0.78rem; }
-.admin__reportes .status-pendiente { background:#fff7ed; color:#92400e; border:1px solid #fbe6c9; }
-.admin__reportes .status-resuelto { background:#ecfdf5; color:#065f46; border:1px solid #c8f7df; }
-.admin__reportes .status-cerrado { background:#f3f4f6; color:#374151; border:1px solid #e6e8eb; }
+.ticket__title {
+  margin: 0 0 0.15rem;
+  font-weight: 700;
+  color: var(--brand-dark);
+  font-size: 1rem;
+}
 
-.admin__reportes .list__buttons { display:flex; gap:0.5rem; }
-.admin__reportes .list__buttons .btn { padding:0.45rem 0.85rem; border-radius:999px; }
+.ticket__meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
 
-.admin__reportes .report-body { width:100%; margin-top:0.6rem; color:#24382f; line-height:1.5; }
-.admin__reportes .admin-reply { margin-top:0.6rem; background:#f6fffa; border-left:4px solid var(--brand); padding:0.7rem; border-radius:6px; }
+.ticket__email {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  font-size: 0.86rem;
+}
 
-.admin__reportes .reply-form { margin-top:0.8rem; display:flex; flex-direction:column; gap:0.6rem; }
-.admin__reportes .pub-textarea { width:100%; min-height:100px; padding:0.7rem; border-radius:8px; border:1px solid #e6f0ea; font-size:0.95rem; }
+.ticket__status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  min-width: 180px;
+}
 
-/* Responsive: stack and align like other admin lists */
+.ticket__date {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.status-pill {
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  text-transform: capitalize;
+}
+
+.status-pill--pending {
+  background: #fff7ed;
+  color: #92400e;
+  border-color: #fed7aa;
+}
+
+.status-pill--resolved {
+  background: #ecfdf5;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.status-pill--closed {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #e5e7eb;
+}
+
+.ticket__body {
+  border-top: 1px dashed #e5e7eb;
+  padding-top: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.ticket__message summary {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #111827;
+  cursor: pointer;
+}
+
+.ticket__message p {
+  margin: 0.4rem 0 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: #111827;
+}
+
+.ticket__reply {
+  background: #f0fdf4;
+  border-radius: 8px;
+  border-left: 3px solid var(--brand);
+  padding: 0.6rem 0.7rem;
+}
+
+.ticket__reply-label {
+  margin: 0 0 0.2rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #15803d;
+}
+
+.ticket__reply p:last-child {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.ticket__reply-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.field--stack span {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--muted);
+  margin-bottom: 0.15rem;
+}
+
+.ticket__textarea {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  padding: 0.6rem 0.7rem;
+  font-size: 0.92rem;
+  resize: vertical;
+}
+
+.ticket__textarea:focus {
+  outline: 2px solid rgba(5, 150, 105, 0.25);
+  outline-offset: 1px;
+  border-color: #a7f3d0;
+}
+
+.ticket__reply-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.ticket__footer {
+  border-top: 1px solid #f3f4f6;
+  padding-top: 0.65rem;
+  margin-top: 0.1rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.ticket__footer-right {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ticket__footer .btn {
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.86rem;
+}
+
 @media (max-width: 880px) {
-  .admin__reportes .list__item { flex-direction:column; }
-  .admin__reportes .list__meta { width:100%; align-items:flex-start; }
-  .admin__reportes .list__buttons { justify-content:flex-start; }
-}
+  .ticket__header {
+    flex-direction: column;
+  }
 
+  .ticket__status {
+    align-items: flex-start;
+    min-width: auto;
+  }
+
+  .ticket__footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ticket__footer-right {
+    justify-content: flex-end;
+  }
+}
 </style>
+
