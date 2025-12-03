@@ -202,6 +202,17 @@ onMounted(cargarDetalle)
 
       <div class="detalle__content">
         <div class="detalle__col detalle__col--main">
+          
+          <section class="detalle__section" v-if="publicacion.portada">
+            <h3>Imagen de portada</h3>
+            <div class="detalle__imagen-wrapper">
+              <img 
+                :src="publicacion.portada" 
+                :alt="publicacion.titulo" 
+                class="detalle__imagen" 
+              />
+            </div>
+          </section>
           <section class="detalle__section">
             <h3>Descripción</h3>
             <p class="detalle__texto">
@@ -598,6 +609,28 @@ onMounted(cargarDetalle)
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* MODIFICACIÓN: Estilos para la imagen */
+.detalle__imagen-wrapper {
+  width: 100%;
+  background-color: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 0.5rem;
+  padding: 1rem;
+}
+
+.detalle__imagen {
+  max-width: 100%;
+  max-height: 400px;
+  object-fit: contain;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
 @media (min-width: 840px) {
