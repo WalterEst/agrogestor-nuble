@@ -1274,24 +1274,83 @@ try {
     }
 });
 
-// 4. PUT: Editar
-app.put('/api/publisher/products/:id', async (req, res) => {
+// 4. PUT: Editar (con soporte para cambiar imagen)
+app.put('/api/publisher/products/:id', upload.single('portada'), async (req, res) => {
     const { id } = req.params;
-    const { name, price, description } = req.body;
+    const { name, price, description, stock } = req.body;
+
+    // Validación básica
+    if (!name || !price) {
+        return res.status(400).json({ message: 'Nombre y precio son requeridos' });
+    }
 
     if (dataSource.mode === 'mock') {
-      
-       return res.json({ message: 'Editado (Mock)' });
+        const index = mockPublicaciones.findIndex(p => String(p.id) === String(id));
+        if (index === -1) {
+            return res.status(404).json({ message: 'Producto no encontrado' });
+        }
+        
+        const portadaUrl = req.file ? `http://localhost:${PORT}/uploads/${req.file.filename}` : mockPublicaciones[index].portada;
+        
+        mockPublicaciones[index] = {
+            ...mockPublicaciones[index],
+            titulo: name,
+            precio: Number(price),
+            descripcion: description || mockPublicaciones[index].descripcion,
+            stock: stock || mockPublicaciones[index].stock,
+            portada: portadaUrl
+        };
+        
+        return res.json({ 
+            message: 'Producto actualizado (Mock)',
+            publicacion: mockPublicaciones[index]
+        });
     }
     
     try {
-        await dataSource.pool.query(
-            'UPDATE publicaciones SET titulo=?, precio=?, descripcion=? WHERE id=?',
-            [name, price, description, id]
+        // Si hay imagen nueva, guardarla en la tabla publicaciones_imagenes
+        if (req.file) {
+            const portadaUrl = `http://localhost:${PORT}/uploads/${req.file.filename}`;
+            
+            // Primero elimina las imágenes antiguas de portada
+            await dataSource.pool.query(
+                'DELETE FROM publicaciones_imagenes WHERE publicacion_id = ? AND es_portada = 1',
+                [id]
+            );
+            
+            // Inserta la nueva imagen como portada
+            await dataSource.pool.query(
+                'INSERT INTO publicaciones_imagenes (publicacion_id, ruta_imagen, es_portada, orden) VALUES (?, ?, 1, 1)',
+                [id, portadaUrl]
+            );
+        }
+        
+        const [result] = await dataSource.pool.query(
+            'UPDATE publicaciones SET titulo=?, precio=?, descripcion=?, stock=?, actualizado_en=NOW() WHERE id=?',
+            [name, Number(price), description, stock || 0, id]
         );
-        return res.json({ message: 'Actualizado correctamente' });
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Producto no encontrado' });
+        }
+
+        // Retorna el producto actualizado
+        const [rows] = await dataSource.pool.query(
+            `SELECT p.id, p.titulo AS name, p.precio AS price, p.descripcion AS description, 
+                    p.stock, p.estado_publicacion AS status,
+                    (SELECT img.ruta_imagen FROM publicaciones_imagenes img 
+                     WHERE img.publicacion_id = p.id ORDER BY img.es_portada DESC LIMIT 1) AS portada
+             FROM publicaciones p WHERE p.id = ?`,
+            [id]
+        );
+
+        return res.json({ 
+            message: 'Producto actualizado correctamente',
+            publicacion: rows[0] || { id, name, price, description, stock }
+        });
     } catch (e) {
-        return res.status(500).json({ message: 'Error al actualizar' });
+        console.error('Error actualizando producto:', e.message);
+        return res.status(500).json({ message: 'Error al actualizar el producto' });
     }
 });
 
